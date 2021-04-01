@@ -41,6 +41,7 @@ class ChargedPFOCorrection : public Processor
 		ChargedPFOCorrection(const ChargedPFOCorrection&) = delete;
 		ChargedPFOCorrection& operator=(const ChargedPFOCorrection&) = delete;
 		virtual void init();
+		virtual void Clear();
 		virtual void processRunHeader();
 		virtual void processEvent( EVENT::LCEvent *pLCEvent );
 		virtual void check( EVENT::LCEvent *pLCEvent );
@@ -57,6 +58,7 @@ class ChargedPFOCorrection : public Processor
 		std::string				m_MarlinTrkTracks{};
 		std::string				m_MarlinTrkTracksKAON{};
 		std::string				m_MarlinTrkTracksPROTON{};
+		std::string				m_outputPfoCollection{};
 
 		int					m_nRun;
 		int					m_nEvt;
