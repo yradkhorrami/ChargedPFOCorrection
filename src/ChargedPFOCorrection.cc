@@ -17,7 +17,11 @@
 #include "TH2F.h"
 #include "TH1I.h"
 #include "TH2I.h"
+#include "TF1.h"
 #include "TTree.h"
+#include "TPaveStats.h"
+#include "TStyle.h"
+#include "TPad.h"
 
 using namespace lcio ;
 using namespace marlin ;
@@ -31,14 +35,51 @@ ChargedPFOCorrection::ChargedPFOCorrection() :
 	m_nEvt(0),
 	m_nRunSum(0),
 	m_nEvtSum(0),
+	n_OldPFOS1trk_NormalizedResidualPx(0),
+	n_OldPFOS1trk_NormalizedResidualPxPy(0),
+	n_OldPFOS1trk_NormalizedResidualPy(0),
+	n_OldPFOS1trk_NormalizedResidualPxPz(0),
+	n_OldPFOS1trk_NormalizedResidualPyPz(0),
+	n_OldPFOS1trk_NormalizedResidualPz(0),
+	n_OldPFOS1trk_NormalizedResidualPxE(0),
+	n_OldPFOS1trk_NormalizedResidualPyE(0),
+	n_OldPFOS1trk_NormalizedResidualPzE(0),
+	n_OldPFOS1trk_NormalizedResidualE(0),
+	n_OldPFOS1trk_NormalizedResidualTheta(0),
+	n_OldPFOS1trk_NormalizedResidualPhi(0),
+	n_NewPFOS1trk_NormalizedResidualPx(0),
+	n_NewPFOS1trk_NormalizedResidualPxPy(0),
+	n_NewPFOS1trk_NormalizedResidualPy(0),
+	n_NewPFOS1trk_NormalizedResidualPxPz(0),
+	n_NewPFOS1trk_NormalizedResidualPyPz(0),
+	n_NewPFOS1trk_NormalizedResidualPz(0),
+	n_NewPFOS1trk_NormalizedResidualPxE(0),
+	n_NewPFOS1trk_NormalizedResidualPyE(0),
+	n_NewPFOS1trk_NormalizedResidualPzE(0),
+	n_NewPFOS1trk_NormalizedResidualE(0),
+	n_NewPFOS1trk_NormalizedResidualTheta(0),
+	n_NewPFOS1trk_NormalizedResidualPhi(0),
+	n_NewPFOS2trk_NormalizedResidualPx(0),
+	n_NewPFOS2trk_NormalizedResidualPxPy(0),
+	n_NewPFOS2trk_NormalizedResidualPy(0),
+	n_NewPFOS2trk_NormalizedResidualPxPz(0),
+	n_NewPFOS2trk_NormalizedResidualPyPz(0),
+	n_NewPFOS2trk_NormalizedResidualPz(0),
+	n_NewPFOS2trk_NormalizedResidualPxE(0),
+	n_NewPFOS2trk_NormalizedResidualPyE(0),
+	n_NewPFOS2trk_NormalizedResidualPzE(0),
+	n_NewPFOS2trk_NormalizedResidualE(0),
+	n_NewPFOS2trk_NormalizedResidualTheta(0),
+	n_NewPFOS2trk_NormalizedResidualPhi(0),
 	m_Bfield(0.f),
 	c(0.),
 	mm2m(0.),
 	eV2GeV(0.),
 	eB(0.),
-	proton_mass(0.),
-	kaon_mass(0.),
-	pion_mass(0.)
+	m_MinWeightTrackMCTruthLink(0.),
+	m_pion_mass(0.),
+	m_proton_mass(0.),
+	m_kaon_mass(0.)
 {
 	_description = "ChargedPFOCorrection creates new RECONSTRUCTEDPARTICLE collection that PFOs are updated using tracks refitted with true mass for protons and kaons";
 
@@ -128,6 +169,24 @@ ChargedPFOCorrection::ChargedPFOCorrection() :
 					float(0.9f)
 				);
 
+	registerProcessorParameter(	"PionMass" ,
+					"Pion mass for calculating (p,E) and CovMat from track parameters"  ,
+					m_pion_mass ,
+					float(0.13957018)
+				);
+
+	registerProcessorParameter(	"ProtonMass" ,
+					"Proton mass for calculating (p,E) and CovMat from track parameters"  ,
+					m_proton_mass ,
+					float(0.938272088)
+				);
+
+	registerProcessorParameter(	"KaonMass" ,
+					"Kaon mass for calculating (p,E) and CovMat from track parameters"  ,
+					m_kaon_mass ,
+					float(0.493677)
+				);
+
 	registerProcessorParameter(	"RootFile",
 	                                "Name of the output root file",
 					m_rootFile,
@@ -151,28 +210,144 @@ void ChargedPFOCorrection::init()
 	m_nEvt = 0 ;
 	m_nRunSum = 0;
 	m_nEvtSum = 0;
-	proton_mass = 0.938272088;
+/*	proton_mass = 0.938272088;
 	kaon_mass = 0.493677;
 	pion_mass = 0.13957018;
-
+*/
 	m_pTFile = new TFile(m_rootFile.c_str(), "recreate");
 
 	m_pTTree = new TTree("PFOswithRFT", "PFOswithRFT");
 	m_pTTree->SetDirectory(m_pTFile);
 	m_pTTree->Branch("run", &m_nRun, "run/I");
 	m_pTTree->Branch("event", &m_nEvt, "event/I");
+	m_pTTree->Branch("pfoCharge", &m_pfoCharge);
+	m_pTTree->Branch("nTracksOfPFO", &m_nTracksOfPFO);
+	m_pTTree->Branch("TrkToMCPLinkWeight", &m_TrkToMCPLinkWeight);
+	m_pTTree->Branch("oldPFO_Px", &m_oldPFO_Px);
+	m_pTTree->Branch("oldPFO_Py", &m_oldPFO_Py);
+	m_pTTree->Branch("oldPFO_Pz", &m_oldPFO_Pz);
+	m_pTTree->Branch("oldPFO_E", &m_oldPFO_E);
+	m_pTTree->Branch("oldPFO_Theta", &m_oldPFO_Theta);
+	m_pTTree->Branch("oldPFO_Phi", &m_oldPFO_Phi);
+	m_pTTree->Branch("newPFO_Px", &m_newPFO_Px);
+	m_pTTree->Branch("newPFO_Py", &m_newPFO_Py);
+	m_pTTree->Branch("newPFO_Pz", &m_newPFO_Pz);
+	m_pTTree->Branch("newPFO_E", &m_newPFO_E);
+	m_pTTree->Branch("newPFO_Theta", &m_newPFO_Theta);
+	m_pTTree->Branch("newPFO_Phi", &m_newPFO_Phi);
+	m_pTTree->Branch("oldPFO_ResidualPx", &m_oldPFO_ResidualPx);
+	m_pTTree->Branch("oldPFO_ResidualPy", &m_oldPFO_ResidualPy);
+	m_pTTree->Branch("oldPFO_ResidualPz", &m_oldPFO_ResidualPz);
+	m_pTTree->Branch("oldPFO_ResidualE", &m_oldPFO_ResidualE);
+	m_pTTree->Branch("oldPFO_ResidualTheta", &m_oldPFO_ResidualTheta);
+	m_pTTree->Branch("oldPFO_ResidualPhi", &m_oldPFO_ResidualPhi);
+	m_pTTree->Branch("newPFO_ResidualPx", &m_newPFO_ResidualPx);
+	m_pTTree->Branch("newPFO_ResidualPy", &m_newPFO_ResidualPy);
+	m_pTTree->Branch("newPFO_ResidualPz", &m_newPFO_ResidualPz);
+	m_pTTree->Branch("newPFO_ResidualE", &m_newPFO_ResidualE);
+	m_pTTree->Branch("newPFO_ResidualTheta", &m_newPFO_ResidualTheta);
+	m_pTTree->Branch("newPFO_ResidualPhi", &m_newPFO_ResidualPhi);
+	m_pTTree->Branch("oldPFO_NormalizedResidualPx", &m_oldPFO_NormalizedResidualPx);
+	m_pTTree->Branch("oldPFO_NormalizedResidualPy", &m_oldPFO_NormalizedResidualPy);
+	m_pTTree->Branch("oldPFO_NormalizedResidualPz", &m_oldPFO_NormalizedResidualPz);
+	m_pTTree->Branch("oldPFO_NormalizedResidualE", &m_oldPFO_NormalizedResidualE);
+	m_pTTree->Branch("oldPFO_NormalizedResidualTheta", &m_oldPFO_NormalizedResidualTheta);
+	m_pTTree->Branch("oldPFO_NormalizedResidualPhi", &m_oldPFO_NormalizedResidualPhi);
+	m_pTTree->Branch("newPFO_NormalizedResidualPx", &m_newPFO_NormalizedResidualPx);
+	m_pTTree->Branch("newPFO_NormalizedResidualPy", &m_newPFO_NormalizedResidualPy);
+	m_pTTree->Branch("newPFO_NormalizedResidualPz", &m_newPFO_NormalizedResidualPz);
+	m_pTTree->Branch("newPFO_NormalizedResidualE", &m_newPFO_NormalizedResidualE);
+	m_pTTree->Branch("newPFO_NormalizedResidualTheta", &m_newPFO_NormalizedResidualTheta);
+	m_pTTree->Branch("newPFO_NormalizedResidualPhi", &m_newPFO_NormalizedResidualPhi);
 	m_Histograms = m_pTFile->mkdir("Histograms");
+	m_OldPFOs_1Trk = m_pTFile->mkdir("OldPFOs_1Trk");
+	m_NewPFOs_1Trk = m_pTFile->mkdir("NewPFOs_1Trk");
+	m_NewPFOs_2Trk = m_pTFile->mkdir("NewPFOs_2Trk");
+	m_NewPFOs_nTrk = m_pTFile->mkdir("NewPFOs_nTrk");
 	h_nClusters_nTracks = new TH2I("All PFOs", "; n_{Clusters}; n_{Tracks}", 11, -0.5, 10.5, 11, -0.5, 10.5);
 	h_pfoCharge_nTracks = new TH2I("Neutral PFOs", "; PFO Charge; n_{Tracks}", 5, -2.5, 2.5, 11, -0.5, 10.5);
 	h_InnermostRadiusHit_Neutral = new TH2F("Neutral PFOs with 2 tracks", "; r_{innermost hit}^{Track 1} [mm]; r_{innermost hit}^{Track 2} [mm]", 180, 0.0, 1800.0, 180, 0.0, 1800.0);
 	h_InnermostRadiusHit_Charged = new TH2F("Charged PFOs with 2 tracks", "; r_{innermost hit}^{Track 1} [mm]; r_{innermost hit}^{Track 2} [mm]", 180, 0.0, 1800.0, 180, 0.0, 1800.0);
 	h_FirstSubDet_Charged = new TH2I("First SubDet of Charged PFOs with 2 tracks", "; First SubDet^{Track 1}; First SubDet^{Track 2}", 11, -0.5, 10.5, 11, -0.5, 10.5);
-
+	h_OldPFOS1trk_NormalizedResidualPx = new TH1F( "old PFO (1 trk)" , "; (_{}p_{x}^{REC} - p_{x}^{MC}) / #sigma_{p_{x}}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_OldPFOS1trk_NormalizedResidualPx = 0;
+	h_OldPFOS1trk_NormalizedResidualPxPy = new TH1F( "old PFO (1 trk)" , "; #sqrt{(_{}p_{x}^{REC} - p_{x}^{MC})#times(_{}p_{y}^{REC} - p_{y}^{MC}) / #sigma_{p_{x}p_{y}}}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_OldPFOS1trk_NormalizedResidualPxPy = 0;
+	h_OldPFOS1trk_NormalizedResidualPy = new TH1F( "old PFO (1 trk)" , "; (_{}p_{y}^{REC} - p_{y}^{MC}) / #sigma_{p_{y}}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_OldPFOS1trk_NormalizedResidualPy = 0;
+	h_OldPFOS1trk_NormalizedResidualPxPz = new TH1F( "old PFO (1 trk)" , "; #sqrt{(_{}p_{x}^{REC} - p_{x}^{MC})#times(_{}p_{z}^{REC} - p_{z}^{MC}) / #sigma_{p_{x}p_{z}}}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_OldPFOS1trk_NormalizedResidualPxPz = 0;
+	h_OldPFOS1trk_NormalizedResidualPyPz = new TH1F( "old PFO (1 trk)" , "; #sqrt{(_{}p_{y}^{REC} - p_{y}^{MC})#times(_{}p_{z}^{REC} - p_{z}^{MC}) / #sigma_{p_{y}p_{z}}}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_OldPFOS1trk_NormalizedResidualPyPz = 0;
+	h_OldPFOS1trk_NormalizedResidualPz = new TH1F( "old PFO (1 trk)" , "; (_{}p_{z}^{REC} - p_{z}^{MC}) / #sigma_{p_{z}}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_OldPFOS1trk_NormalizedResidualPz = 0;
+	h_OldPFOS1trk_NormalizedResidualPxE = new TH1F( "old PFO (1 trk)" , "; #sqrt{(_{}p_{x}^{REC} - p_{x}^{MC})#times(_{}E^{REC} - E^{MC}) / #sigma_{p_{x}E}}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_OldPFOS1trk_NormalizedResidualPxE = 0;
+	h_OldPFOS1trk_NormalizedResidualPyE = new TH1F( "old PFO (1 trk)" , "; #sqrt{(_{}p_{y}^{REC} - p_{y}^{MC})#times(_{}E^{REC} - E^{MC}) / #sigma_{p_{y}E}}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_OldPFOS1trk_NormalizedResidualPyE = 0;
+	h_OldPFOS1trk_NormalizedResidualPzE = new TH1F( "old PFO (1 trk)" , "; #sqrt{(_{}p_{z}^{REC} - p_{z}^{MC})#times(_{}E^{REC} - E^{MC}) / #sigma_{p_{z}E}}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_OldPFOS1trk_NormalizedResidualPzE = 0;
+	h_OldPFOS1trk_NormalizedResidualE = new TH1F( "old PFO (1 trk)" , "; (_{}E^{REC} - E^{MC}) / #sigma_{E}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_OldPFOS1trk_NormalizedResidualE = 0;
+	h_OldPFOS1trk_NormalizedResidualTheta = new TH1F( "old PFO (1 trk)" , "; (_{}#theta^{REC} - #theta^{MC}) / #sigma_{#theta}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_OldPFOS1trk_NormalizedResidualTheta = 0;
+	h_OldPFOS1trk_NormalizedResidualPhi = new TH1F( "old PFO (1 trk)" , "; (_{}#phi^{REC} - #phi^{MC}) / #sigma_{#phi}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_OldPFOS1trk_NormalizedResidualPhi = 0;
+	h_NewPFOS1trk_NormalizedResidualPx = new TH1F( "new PFO (1 trk)" , "; (_{}p_{x}^{REC} - p_{x}^{MC}) / #sigma_{p_{x}}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_NewPFOS1trk_NormalizedResidualPx = 0;
+	h_NewPFOS1trk_NormalizedResidualPxPy = new TH1F( "new PFO (1 trk)" , "; #sqrt{(_{}p_{x}^{REC} - p_{x}^{MC})#times(_{}p_{y}^{REC} - p_{y}^{MC}) / #sigma_{p_{x}p_{y}}}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_NewPFOS1trk_NormalizedResidualPxPy = 0;
+	h_NewPFOS1trk_NormalizedResidualPy = new TH1F( "new PFO (1 trk)" , "; (_{}p_{y}^{REC} - p_{y}^{MC}) / #sigma_{p_{y}}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_NewPFOS1trk_NormalizedResidualPy = 0;
+	h_NewPFOS1trk_NormalizedResidualPxPz = new TH1F( "new PFO (1 trk)" , "; #sqrt{(_{}p_{x}^{REC} - p_{x}^{MC})#times(_{}p_{z}^{REC} - p_{z}^{MC}) / #sigma_{p_{x}p_{z}}}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_NewPFOS1trk_NormalizedResidualPxPz = 0;
+	h_NewPFOS1trk_NormalizedResidualPyPz = new TH1F( "new PFO (1 trk)" , "; #sqrt{(_{}p_{y}^{REC} - p_{y}^{MC})#times(_{}p_{z}^{REC} - p_{z}^{MC}) / #sigma_{p_{y}p_{z}}}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_NewPFOS1trk_NormalizedResidualPyPz = 0;
+	h_NewPFOS1trk_NormalizedResidualPz = new TH1F( "new PFO (1 trk)" , "; (_{}p_{z}^{REC} - p_{z}^{MC}) / #sigma_{p_{z}}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_NewPFOS1trk_NormalizedResidualPz = 0;
+	h_NewPFOS1trk_NormalizedResidualPxE = new TH1F( "new PFO (1 trk)" , "; #sqrt{(_{}p_{x}^{REC} - p_{x}^{MC})#times(_{}E^{REC} - E^{MC}) / #sigma_{p_{x}E}}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_NewPFOS1trk_NormalizedResidualPxE = 0;
+	h_NewPFOS1trk_NormalizedResidualPyE = new TH1F( "new PFO (1 trk)" , "; #sqrt{(_{}p_{y}^{REC} - p_{y}^{MC})#times(_{}E^{REC} - E^{MC}) / #sigma_{p_{y}E}}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_NewPFOS1trk_NormalizedResidualPyE = 0;
+	h_NewPFOS1trk_NormalizedResidualPzE = new TH1F( "new PFO (1 trk)" , "; #sqrt{(_{}p_{z}^{REC} - p_{z}^{MC})#times(_{}E^{REC} - E^{MC}) / #sigma_{p_{z}E}}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_NewPFOS1trk_NormalizedResidualPzE = 0;
+	h_NewPFOS1trk_NormalizedResidualE = new TH1F( "new PFO (1 trk)" , "; (_{}E^{REC} - E^{MC}) / #sigma_{E}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_NewPFOS1trk_NormalizedResidualE = 0;
+	h_NewPFOS1trk_NormalizedResidualTheta = new TH1F( "new PFO (1 trk)" , "; (_{}#theta^{REC} - #theta^{MC}) / #sigma_{#theta}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_NewPFOS1trk_NormalizedResidualTheta = 0;
+	h_NewPFOS1trk_NormalizedResidualPhi = new TH1F( "new PFO (1 trk)" , "; (_{}#phi^{REC} - #phi^{MC}) / #sigma_{#phi}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_NewPFOS1trk_NormalizedResidualPhi = 0;
+	h_NewPFOS2trk_NormalizedResidualPx = new TH1F( "new PFO (2 trk)" , "; (_{}p_{x}^{REC} - p_{x}^{MC}) / #sigma_{p_{x}}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_NewPFOS2trk_NormalizedResidualPx = 0;
+	h_NewPFOS2trk_NormalizedResidualPxPy = new TH1F( "new PFO (2 trk)" , "; #sqrt{(_{}p_{x}^{REC} - p_{x}^{MC})#times(_{}p_{y}^{REC} - p_{y}^{MC}) / #sigma_{p_{x}p_{y}}}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_NewPFOS2trk_NormalizedResidualPxPy = 0;
+	h_NewPFOS2trk_NormalizedResidualPy = new TH1F( "new PFO (2 trk)" , "; (_{}p_{y}^{REC} - p_{y}^{MC}) / #sigma_{p_{y}}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_NewPFOS2trk_NormalizedResidualPy = 0;
+	h_NewPFOS2trk_NormalizedResidualPxPz = new TH1F( "new PFO (2 trk)" , "; #sqrt{(_{}p_{x}^{REC} - p_{x}^{MC})#times(_{}p_{z}^{REC} - p_{z}^{MC}) / #sigma_{p_{x}p_{z}}}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_NewPFOS2trk_NormalizedResidualPxPz = 0;
+	h_NewPFOS2trk_NormalizedResidualPyPz = new TH1F( "new PFO (2 trk)" , "; #sqrt{(_{}p_{y}^{REC} - p_{y}^{MC})#times(_{}p_{z}^{REC} - p_{z}^{MC}) / #sigma_{p_{y}p_{z}}}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_NewPFOS2trk_NormalizedResidualPyPz = 0;
+	h_NewPFOS2trk_NormalizedResidualPz = new TH1F( "new PFO (2 trk)" , "; (_{}p_{z}^{REC} - p_{z}^{MC}) / #sigma_{p_{z}}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_NewPFOS2trk_NormalizedResidualPz = 0;
+	h_NewPFOS2trk_NormalizedResidualPxE = new TH1F( "new PFO (2 trk)" , "; #sqrt{(_{}p_{x}^{REC} - p_{x}^{MC})#times(_{}E^{REC} - E^{MC}) / #sigma_{p_{x}E}}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_NewPFOS2trk_NormalizedResidualPxE = 0;
+	h_NewPFOS2trk_NormalizedResidualPyE = new TH1F( "new PFO (2 trk)" , "; #sqrt{(_{}p_{y}^{REC} - p_{y}^{MC})#times(_{}E^{REC} - E^{MC}) / #sigma_{p_{y}E}}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_NewPFOS2trk_NormalizedResidualPyE = 0;
+	h_NewPFOS2trk_NormalizedResidualPzE = new TH1F( "new PFO (2 trk)" , "; #sqrt{(_{}p_{z}^{REC} - p_{z}^{MC})#times(_{}E^{REC} - E^{MC}) / #sigma_{p_{z}E}}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_NewPFOS2trk_NormalizedResidualPzE = 0;
+	h_NewPFOS2trk_NormalizedResidualE = new TH1F( "new PFO (2 trk)" , "; (_{}E^{REC} - E^{MC}) / #sigma_{E}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_NewPFOS2trk_NormalizedResidualE = 0;
+	h_NewPFOS2trk_NormalizedResidualTheta = new TH1F( "new PFO (2 trk)" , "; (_{}#theta^{REC} - #theta^{MC}) / #sigma_{#theta}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_NewPFOS2trk_NormalizedResidualTheta = 0;
+	h_NewPFOS2trk_NormalizedResidualPhi = new TH1F( "new PFO (2 trk)" , "; (_{}#phi^{REC} - #phi^{MC}) / #sigma_{#phi}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_NewPFOS2trk_NormalizedResidualPhi = 0;
 }
 
 void ChargedPFOCorrection::Clear()
 {
-
+	m_pfoCharge.clear();
+	m_nTracksOfPFO.clear();
+	m_TrkToMCPLinkWeight.clear();
+	m_oldPFO_Px.clear();
+	m_oldPFO_Py.clear();
+	m_oldPFO_Pz.clear();
+	m_oldPFO_E.clear();
+	m_oldPFO_Theta.clear();
+	m_oldPFO_Phi.clear();
+	m_newPFO_Px.clear();
+	m_newPFO_Py.clear();
+	m_newPFO_Pz.clear();
+	m_newPFO_E.clear();
+	m_newPFO_Theta.clear();
+	m_newPFO_Phi.clear();
+	m_oldPFO_ResidualPx.clear();
+	m_oldPFO_ResidualPy.clear();
+	m_oldPFO_ResidualPz.clear();
+	m_oldPFO_ResidualE.clear();
+	m_oldPFO_ResidualTheta.clear();
+	m_oldPFO_ResidualPhi.clear();
+	m_newPFO_ResidualPx.clear();
+	m_newPFO_ResidualPy.clear();
+	m_newPFO_ResidualPz.clear();
+	m_newPFO_ResidualE.clear();
+	m_newPFO_ResidualTheta.clear();
+	m_newPFO_ResidualPhi.clear();
+	m_oldPFO_NormalizedResidualPx.clear();
+	m_oldPFO_NormalizedResidualPy.clear();
+	m_oldPFO_NormalizedResidualPz.clear();
+	m_oldPFO_NormalizedResidualE.clear();
+	m_oldPFO_NormalizedResidualTheta.clear();
+	m_oldPFO_NormalizedResidualPhi.clear();
+	m_newPFO_NormalizedResidualPx.clear();
+	m_newPFO_NormalizedResidualPy.clear();
+	m_newPFO_NormalizedResidualPz.clear();
+	m_newPFO_NormalizedResidualE.clear();
+	m_newPFO_NormalizedResidualTheta.clear();
+	m_newPFO_NormalizedResidualPhi.clear();
 }
 
 void ChargedPFOCorrection::processRunHeader()
@@ -245,16 +420,18 @@ void ChargedPFOCorrection::processEvent( EVENT::LCEvent *pLCEvent )
 			int nClustersofPFO = (inputPFO->getClusters()).size();
 			h_nClusters_nTracks->Fill( nClustersofPFO , nTRKsofPFO );
 			Track *refittedTrack = NULL;
-			double maxweightTRKtoMCP = 0.;
+//			double maxweightTRKtoMCP = 0.;
 			bool m_updatePFO = true;
 			bool foundLinkedMCP = true;
-			float pfoMass = 0.0;
+//			float pfoMass = 0.0;
 			TLorentzVector pfoFourMomentum( 0.0 , 0.0 , 0.0 , 0.0 );
 			TLorentzVector mcpFourMomentum( 0.0 , 0.0 , 0.0 , 0.0 );
 			std::vector<float> oldResiduals( 6 , 0.0 );
 			std::vector<float> newResiduals( 6 , 0.0 );
-			std::vector<float> newPFOCovMat( 10, 0.0 );
 			std::vector<float> oldPFOCovMat = inputPFO->getCovMatrix();
+			std::vector<float> newPFOCovMat( 10, 0.0 );
+			std::vector<float> oldAngularUncertainties( 2 , 0.0 );
+			std::vector<float> newAngularUncertainties( 2 , 0.0 );
 			std::vector<float> trkCovMat( 10, 0.0 );
 			std::vector<float> RadiusOfInnermostHit( nTRKsofPFO , 0.0 );
 
@@ -268,6 +445,8 @@ void ChargedPFOCorrection::processEvent( EVENT::LCEvent *pLCEvent )
 			{
 				streamlog_out(DEBUG3) << "	Processing a charged PFO at index: 	" << i_pfo << " 	with 	" << nTRKsofPFO << " 	track(s)" << std::endl;
 			}
+			m_pfoCharge.push_back( inputPFO->getCharge() );
+			m_nTracksOfPFO.push_back( nTRKsofPFO );
 			h_pfoCharge_nTracks->Fill( inputPFO->getCharge() , nTRKsofPFO );
 
 			if ( nTRKsofPFO == 0 )
@@ -299,23 +478,23 @@ void ChargedPFOCorrection::processEvent( EVENT::LCEvent *pLCEvent )
 				{
 					refittedTrack = dynamic_cast<EVENT::Track*>( MarlinTrkTracksPROTON->getElementAt( TrackIndex ) );
 					outputPFOtrkvec.push_back( refittedTrack );
-					trackMass = proton_mass;
-					m_updatePFO = true;
+					trackMass = m_proton_mass;
+					m_updatePFO = m_updatePFOwithOneTrack;
 					streamlog_out(DEBUG2) << "	Default track is replace with track refitted with proton mass" << std::endl;
 				}
 				else if ( abs( TrackID ) == 321 )
 				{
 					refittedTrack = dynamic_cast<EVENT::Track*>( MarlinTrkTracksKAON->getElementAt( TrackIndex ) );
 					outputPFOtrkvec.push_back( refittedTrack );
-					trackMass = kaon_mass;
-					m_updatePFO = true;
+					trackMass = m_kaon_mass;
+					m_updatePFO = m_updatePFOwithOneTrack;
 					streamlog_out(DEBUG2) << "	Default track is replace with track refitted with kaon mass" << std::endl;
 				}
 				else
 				{
 					refittedTrack = dynamic_cast<EVENT::Track*>( MarlinTrkTracks->getElementAt( TrackIndex ) );
 					outputPFOtrkvec.push_back( refittedTrack );
-					trackMass = pion_mass;
+					trackMass = m_pion_mass;
 					m_updatePFO = m_updatePFOwithPionTrack;
 					streamlog_out(DEBUG2) << "	Default track is used for updating PFO" << std::endl;
 				}
@@ -370,23 +549,23 @@ void ChargedPFOCorrection::processEvent( EVENT::LCEvent *pLCEvent )
 						{
 							refittedTrack = dynamic_cast<EVENT::Track*>( MarlinTrkTracksPROTON->getElementAt( TrackIndex ) );
 							outputPFOtrkvec.push_back( refittedTrack );
-							trackMass = proton_mass;
-							m_updatePFO = true;
+							trackMass = m_proton_mass;
+							m_updatePFO = m_updatePFOwithTwoTrack;
 							streamlog_out(DEBUG2) << "	Default track is replace with track refitted with proton mass" << std::endl;
 						}
 						else if ( abs( TrackID ) == 321 )
 						{
 							refittedTrack = dynamic_cast<EVENT::Track*>( MarlinTrkTracksKAON->getElementAt( TrackIndex ) );
 							outputPFOtrkvec.push_back( refittedTrack );
-							trackMass = kaon_mass;
-							m_updatePFO = true;
+							trackMass = m_kaon_mass;
+							m_updatePFO = m_updatePFOwithTwoTrack;
 							streamlog_out(DEBUG2) << "	Default track is replace with track refitted with kaon mass" << std::endl;
 						}
 						else
 						{
 							refittedTrack = dynamic_cast<EVENT::Track*>( MarlinTrkTracks->getElementAt( TrackIndex ) );
 							outputPFOtrkvec.push_back( refittedTrack );
-							trackMass = pion_mass;
+							trackMass = m_pion_mass;
 							m_updatePFO = m_updatePFOwithPionTrack;
 							streamlog_out(DEBUG2) << "	Default track is used for updating PFO" << std::endl;
 						}
@@ -401,6 +580,8 @@ void ChargedPFOCorrection::processEvent( EVENT::LCEvent *pLCEvent )
 				}
 				else
 				{
+					foundLinkedMCP = false;
+					m_updatePFO = false;
 /*
 					h_InnermostRadiusHit_Charged->Fill( RadiusOfInnermostHit[ 0 ] , RadiusOfInnermostHit[ 1 ] );
 					int firstSubDet_trk1 = 41;
@@ -428,14 +609,25 @@ void ChargedPFOCorrection::processEvent( EVENT::LCEvent *pLCEvent )
 */
 				}
 			}
+			else
+			{
+				foundLinkedMCP = false;
+				m_updatePFO = false;
+			}
 			if( m_updatePFO )
 			{
 				this->updatePFO( inputPFO , outputPFO , outputPFOtrkvec , pfoFourMomentum , newPFOCovMat );
+				m_newPFO_Px.push_back( pfoFourMomentum.Px() );		m_newPFO_Py.push_back( pfoFourMomentum.Py() );		m_newPFO_Pz.push_back( pfoFourMomentum.Pz() );
+				m_newPFO_E.push_back( pfoFourMomentum.E() );		m_newPFO_Theta.push_back( pfoFourMomentum.Theta() );	m_newPFO_Phi.push_back( pfoFourMomentum.Phi() );
 			}
 			else
 			{
 				this->updatePFO( inputPFO , outputPFO , inputPFOtrkvec , oldpfoFourMomentum , oldPFOCovMat );
+				m_newPFO_Px.push_back( oldpfoFourMomentum.Px() );	m_newPFO_Py.push_back( oldpfoFourMomentum.Py() );	m_newPFO_Pz.push_back( oldpfoFourMomentum.Pz() );
+				m_newPFO_E.push_back( oldpfoFourMomentum.E() );		m_newPFO_Theta.push_back( oldpfoFourMomentum.Theta() );	m_newPFO_Phi.push_back( oldpfoFourMomentum.Phi() );
 			}
+			m_oldPFO_Px.push_back( oldpfoFourMomentum.Px() );	m_oldPFO_Py.push_back( oldpfoFourMomentum.Py() );	m_oldPFO_Pz.push_back( oldpfoFourMomentum.Pz() );
+			m_oldPFO_E.push_back( oldpfoFourMomentum.E() );		m_oldPFO_Theta.push_back( oldpfoFourMomentum.Theta() );	m_oldPFO_Phi.push_back( oldpfoFourMomentum.Phi() );
 
 			streamlog_out(DEBUG3) << "	------------------------------" << std::endl;
 			streamlog_out(DEBUG3) << "	Getting Residuals for inputPFO" << std::endl;
@@ -444,6 +636,100 @@ void ChargedPFOCorrection::processEvent( EVENT::LCEvent *pLCEvent )
 			streamlog_out(DEBUG3) << "	Getting Residuals for outputPFO" << std::endl;
 			TLorentzVector newpfoFourMomentum( outputPFO->getMomentum()[ 0 ] , outputPFO->getMomentum()[ 1 ] , outputPFO->getMomentum()[ 2 ] , outputPFO->getEnergy() );
 			if ( foundLinkedMCP ) newResiduals = this->getPFOResidual( newpfoFourMomentum , mcpFourMomentum );
+			if ( foundLinkedMCP )
+			{
+				oldAngularUncertainties = this->getAngularUncertainties( oldpfoFourMomentum , oldPFOCovMat );
+				newAngularUncertainties = this->getAngularUncertainties( newpfoFourMomentum , newPFOCovMat );
+
+				m_oldPFO_ResidualPx.push_back( oldResiduals[ 0 ] );	m_oldPFO_ResidualPy.push_back( oldResiduals[ 1 ] );	m_oldPFO_ResidualPz.push_back( oldResiduals[ 2 ] );
+				m_oldPFO_ResidualE.push_back( oldResiduals[ 3 ] );	m_oldPFO_ResidualTheta.push_back( oldResiduals[ 4 ] );	m_oldPFO_ResidualPhi.push_back( oldResiduals[ 5 ] );
+				m_newPFO_ResidualPx.push_back( newResiduals[ 0 ] );	m_newPFO_ResidualPy.push_back( newResiduals[ 1 ] );	m_newPFO_ResidualPz.push_back( newResiduals[ 2 ] );
+				m_newPFO_ResidualE.push_back( newResiduals[ 3 ] );	m_newPFO_ResidualTheta.push_back( newResiduals[ 4 ] );	m_newPFO_ResidualPhi.push_back( newResiduals[ 5 ] );
+				if ( nTRKsofPFO == 1 )
+				{
+					m_oldPFO_NormalizedResidualPx.push_back( oldResiduals[ 0 ] / sqrt( oldPFOCovMat[ 0 ] ) );
+					m_oldPFO_NormalizedResidualPy.push_back( oldResiduals[ 1 ] / sqrt( oldPFOCovMat[ 2 ] ) );
+					m_oldPFO_NormalizedResidualPz.push_back( oldResiduals[ 2 ] / sqrt( oldPFOCovMat[ 5 ] ) );
+					m_oldPFO_NormalizedResidualE.push_back( oldResiduals[ 3 ] / sqrt( oldPFOCovMat[ 9 ] ) );
+					m_oldPFO_NormalizedResidualTheta.push_back( oldResiduals[ 4 ] / oldAngularUncertainties[ 0 ] );
+					m_oldPFO_NormalizedResidualPhi.push_back( oldResiduals[ 5 ] / oldAngularUncertainties[ 1 ] );
+					h_OldPFOS1trk_NormalizedResidualPx->Fill( oldResiduals[ 0 ] / sqrt( oldPFOCovMat[ 0 ] ) ); ++n_OldPFOS1trk_NormalizedResidualPx;
+					int OldPFO_SignNormResi1 = ( oldResiduals[ 0 ] * oldResiduals[ 1 ] / oldPFOCovMat[ 1 ] >= 0 ? 1 : -1 );
+					h_OldPFOS1trk_NormalizedResidualPxPy->Fill( OldPFO_SignNormResi1 * sqrt( fabs( oldResiduals[ 0 ] ) * fabs( oldResiduals[ 1 ] ) / fabs( oldPFOCovMat[ 1 ] ) ) ); ++n_OldPFOS1trk_NormalizedResidualPxPy;
+					h_OldPFOS1trk_NormalizedResidualPy->Fill( oldResiduals[ 1 ] / sqrt( oldPFOCovMat[ 2 ] ) ); ++n_OldPFOS1trk_NormalizedResidualPy;
+					int OldPFO_SignNormResi3 = ( oldResiduals[ 0 ] * oldResiduals[ 2 ] / oldPFOCovMat[ 3 ] >= 0 ? 1 : -1 );
+					h_OldPFOS1trk_NormalizedResidualPxPz->Fill( OldPFO_SignNormResi3 * sqrt( fabs( oldResiduals[ 0 ] ) * fabs( oldResiduals[ 2 ] ) / fabs( oldPFOCovMat[ 3 ] ) ) ); ++n_OldPFOS1trk_NormalizedResidualPxPz;
+					int OldPFO_SignNormResi4 = ( oldResiduals[ 1 ] * oldResiduals[ 2 ] / oldPFOCovMat[ 4 ] >= 0 ? 1 : -1 );
+					h_OldPFOS1trk_NormalizedResidualPyPz->Fill( OldPFO_SignNormResi4 * sqrt( fabs( oldResiduals[ 1 ] ) * fabs( oldResiduals[ 2 ] ) / fabs( oldPFOCovMat[ 4 ] ) ) ); ++n_OldPFOS1trk_NormalizedResidualPyPz;
+					h_OldPFOS1trk_NormalizedResidualPz->Fill( oldResiduals[ 2 ] / sqrt( oldPFOCovMat[ 5 ] ) ); ++n_OldPFOS1trk_NormalizedResidualPz;
+					int OldPFO_SignNormResi6 = ( oldResiduals[ 0 ] * oldResiduals[ 3 ] / oldPFOCovMat[ 6 ] >= 0 ? 1 : -1 );
+					h_OldPFOS1trk_NormalizedResidualPxE->Fill( OldPFO_SignNormResi6 * sqrt( fabs( oldResiduals[ 0 ] ) * fabs( oldResiduals[ 3 ] ) / fabs( oldPFOCovMat[ 6 ] ) ) ); ++n_OldPFOS1trk_NormalizedResidualPxE;
+					int OldPFO_SignNormResi7 = ( oldResiduals[ 1 ] * oldResiduals[ 3 ] / oldPFOCovMat[ 7 ] >= 0 ? 1 : -1 );
+					h_OldPFOS1trk_NormalizedResidualPyE->Fill( OldPFO_SignNormResi7 * sqrt( fabs( oldResiduals[ 1 ] ) * fabs( oldResiduals[ 3 ] ) / fabs( oldPFOCovMat[ 7 ] ) ) ); ++n_OldPFOS1trk_NormalizedResidualPyE;
+					int OldPFO_SignNormResi8 = ( oldResiduals[ 2 ] * oldResiduals[ 3 ] / oldPFOCovMat[ 6 ] >= 0 ? 1 : -1 );
+					h_OldPFOS1trk_NormalizedResidualPzE->Fill( OldPFO_SignNormResi8 * sqrt( fabs( oldResiduals[ 2 ] ) * fabs( oldResiduals[ 3 ] ) / fabs( oldPFOCovMat[ 8 ] ) ) ); ++n_OldPFOS1trk_NormalizedResidualPzE;
+					h_OldPFOS1trk_NormalizedResidualE->Fill( oldResiduals[ 3 ] / sqrt( oldPFOCovMat[ 9 ] ) ); ++n_OldPFOS1trk_NormalizedResidualE;
+					h_OldPFOS1trk_NormalizedResidualTheta->Fill( oldResiduals[ 4 ] / oldAngularUncertainties[ 0 ] ); ++n_OldPFOS1trk_NormalizedResidualTheta;
+					h_OldPFOS1trk_NormalizedResidualPhi->Fill( oldResiduals[ 5 ] / oldAngularUncertainties[ 1 ] ); ++n_OldPFOS1trk_NormalizedResidualPhi;
+					m_newPFO_NormalizedResidualPx.push_back( newResiduals[ 0 ] / sqrt( newPFOCovMat[ 0 ] ) );
+					m_newPFO_NormalizedResidualPy.push_back( newResiduals[ 1 ] / sqrt( newPFOCovMat[ 2 ] ) );
+					m_newPFO_NormalizedResidualPz.push_back( newResiduals[ 2 ] / sqrt( newPFOCovMat[ 5 ] ) );
+					m_newPFO_NormalizedResidualE.push_back( newResiduals[ 3 ] / sqrt( newPFOCovMat[ 9 ] ) );
+					m_newPFO_NormalizedResidualTheta.push_back( newResiduals[ 4 ] / newAngularUncertainties[ 0 ] );
+					m_newPFO_NormalizedResidualPhi.push_back( newResiduals[ 5 ] / newAngularUncertainties[ 1 ] );
+					h_NewPFOS1trk_NormalizedResidualPx->Fill( newResiduals[ 0 ] / sqrt( newPFOCovMat[ 0 ] ) ); ++n_NewPFOS1trk_NormalizedResidualPx;
+					int NewPFO_SignNormResi1 = ( newResiduals[ 0 ] * newResiduals[ 1 ] / newPFOCovMat[ 1 ] >= 0 ? 1 : -1 );
+					h_NewPFOS1trk_NormalizedResidualPxPy->Fill( NewPFO_SignNormResi1 * sqrt( fabs( newResiduals[ 0 ] ) * fabs( newResiduals[ 1 ] ) / fabs( newPFOCovMat[ 1 ] ) ) ); ++n_NewPFOS1trk_NormalizedResidualPxPy;
+					h_NewPFOS1trk_NormalizedResidualPy->Fill( newResiduals[ 1 ] / sqrt( newPFOCovMat[ 2 ] ) ); ++n_NewPFOS1trk_NormalizedResidualPy;
+					int NewPFO_SignNormResi3 = ( newResiduals[ 0 ] * newResiduals[ 2 ] / newPFOCovMat[ 3 ] >= 0 ? 1 : -1 );
+					h_NewPFOS1trk_NormalizedResidualPxPz->Fill( NewPFO_SignNormResi3 * sqrt( fabs( newResiduals[ 0 ] ) * fabs( newResiduals[ 2 ] ) / fabs( newPFOCovMat[ 3 ] ) ) ); ++n_NewPFOS1trk_NormalizedResidualPxPz;
+					int NewPFO_SignNormResi4 = ( newResiduals[ 1 ] * newResiduals[ 2 ] / newPFOCovMat[ 4 ] >= 0 ? 1 : -1 );
+					h_NewPFOS1trk_NormalizedResidualPyPz->Fill( NewPFO_SignNormResi4 * sqrt( fabs( newResiduals[ 1 ] ) * fabs( newResiduals[ 2 ] ) / fabs( newPFOCovMat[ 4 ] ) ) ); ++n_NewPFOS1trk_NormalizedResidualPyPz;
+					h_NewPFOS1trk_NormalizedResidualPz->Fill( newResiduals[ 2 ] / sqrt( newPFOCovMat[ 5 ] ) ); ++n_NewPFOS1trk_NormalizedResidualPz;
+					int NewPFO_SignNormResi6 = ( newResiduals[ 0 ] * newResiduals[ 3 ] / newPFOCovMat[ 6 ] >= 0 ? 1 : -1 );
+					h_NewPFOS1trk_NormalizedResidualPxE->Fill( NewPFO_SignNormResi6 * sqrt( fabs( newResiduals[ 0 ] ) * fabs( newResiduals[ 3 ] ) / fabs( newPFOCovMat[ 6 ] ) ) ); ++n_NewPFOS1trk_NormalizedResidualPxE;
+					int NewPFO_SignNormResi7 = ( newResiduals[ 1 ] * newResiduals[ 3 ] / newPFOCovMat[ 7 ] >= 0 ? 1 : -1 );
+					h_NewPFOS1trk_NormalizedResidualPyE->Fill( NewPFO_SignNormResi7 * sqrt( fabs( newResiduals[ 1 ] ) * fabs( newResiduals[ 3 ] ) / fabs( newPFOCovMat[ 7 ] ) ) ); ++n_NewPFOS1trk_NormalizedResidualPyE;
+					int NewPFO_SignNormResi8 = ( newResiduals[ 2 ] * newResiduals[ 3 ] / newPFOCovMat[ 6 ] >= 0 ? 1 : -1 );
+					h_NewPFOS1trk_NormalizedResidualPzE->Fill( NewPFO_SignNormResi8 * sqrt( fabs( newResiduals[ 2 ] ) * fabs( newResiduals[ 3 ] ) / fabs( newPFOCovMat[ 8 ] ) ) ); ++n_NewPFOS1trk_NormalizedResidualPzE;
+					h_NewPFOS1trk_NormalizedResidualE->Fill( newResiduals[ 3 ] / sqrt( newPFOCovMat[ 9 ] ) ); ++n_NewPFOS1trk_NormalizedResidualE;
+					h_NewPFOS1trk_NormalizedResidualTheta->Fill( newResiduals[ 4 ] / newAngularUncertainties[ 0 ] ); ++n_NewPFOS1trk_NormalizedResidualTheta;
+					h_NewPFOS1trk_NormalizedResidualPhi->Fill( newResiduals[ 5 ] / newAngularUncertainties[ 1 ] ); ++n_NewPFOS1trk_NormalizedResidualPhi;
+				}
+				else if ( nTRKsofPFO == 2 )
+				{
+					m_oldPFO_NormalizedResidualPx.push_back( 0 );
+					m_oldPFO_NormalizedResidualPy.push_back( 0 );
+					m_oldPFO_NormalizedResidualPz.push_back( 0 );
+					m_oldPFO_NormalizedResidualE.push_back( 0 );
+					m_oldPFO_NormalizedResidualTheta.push_back( 0 );
+					m_oldPFO_NormalizedResidualPhi.push_back( 0 );
+					m_newPFO_NormalizedResidualPx.push_back( newResiduals[ 0 ] / sqrt( newPFOCovMat[ 0 ] ) );
+					m_newPFO_NormalizedResidualPy.push_back( newResiduals[ 1 ] / sqrt( newPFOCovMat[ 2 ] ) );
+					m_newPFO_NormalizedResidualPz.push_back( newResiduals[ 2 ] / sqrt( newPFOCovMat[ 5 ] ) );
+					m_newPFO_NormalizedResidualE.push_back( newResiduals[ 3 ] / sqrt( newPFOCovMat[ 9 ] ) );
+					m_newPFO_NormalizedResidualTheta.push_back( newResiduals[ 4 ] / newAngularUncertainties[ 0 ] );
+					m_newPFO_NormalizedResidualPhi.push_back( newResiduals[ 5 ] / newAngularUncertainties[ 1 ] );
+					h_NewPFOS2trk_NormalizedResidualPx->Fill( newResiduals[ 0 ] / sqrt( newPFOCovMat[ 0 ] ) ); ++n_NewPFOS2trk_NormalizedResidualPx;
+					int NewPFO_SignNormResi1 = ( newResiduals[ 0 ] * newResiduals[ 1 ] / newPFOCovMat[ 1 ] >= 0 ? 1 : -1 );
+					h_NewPFOS2trk_NormalizedResidualPxPy->Fill( NewPFO_SignNormResi1 * sqrt( fabs( newResiduals[ 0 ] ) * fabs( newResiduals[ 1 ] ) / fabs( newPFOCovMat[ 1 ] ) ) ); ++n_NewPFOS2trk_NormalizedResidualPxPy;
+					h_NewPFOS2trk_NormalizedResidualPy->Fill( newResiduals[ 1 ] / sqrt( newPFOCovMat[ 2 ] ) ); ++n_NewPFOS2trk_NormalizedResidualPy;
+					int NewPFO_SignNormResi3 = ( newResiduals[ 0 ] * newResiduals[ 2 ] / newPFOCovMat[ 3 ] >= 0 ? 1 : -1 );
+					h_NewPFOS2trk_NormalizedResidualPxPz->Fill( NewPFO_SignNormResi3 * sqrt( fabs( newResiduals[ 0 ] ) * fabs( newResiduals[ 2 ] ) / fabs( newPFOCovMat[ 3 ] ) ) ); ++n_NewPFOS2trk_NormalizedResidualPxPz;
+					int NewPFO_SignNormResi4 = ( newResiduals[ 1 ] * newResiduals[ 2 ] / newPFOCovMat[ 4 ] >= 0 ? 1 : -1 );
+					h_NewPFOS2trk_NormalizedResidualPyPz->Fill( NewPFO_SignNormResi4 * sqrt( fabs( newResiduals[ 1 ] ) * fabs( newResiduals[ 2 ] ) / fabs( newPFOCovMat[ 4 ] ) ) ); ++n_NewPFOS2trk_NormalizedResidualPyPz;
+					h_NewPFOS2trk_NormalizedResidualPz->Fill( newResiduals[ 2 ] / sqrt( newPFOCovMat[ 5 ] ) ); ++n_NewPFOS2trk_NormalizedResidualPz;
+					int NewPFO_SignNormResi6 = ( newResiduals[ 0 ] * newResiduals[ 3 ] / newPFOCovMat[ 6 ] >= 0 ? 1 : -1 );
+					h_NewPFOS2trk_NormalizedResidualPxE->Fill( NewPFO_SignNormResi6 * sqrt( fabs( newResiduals[ 0 ] ) * fabs( newResiduals[ 3 ] ) / fabs( newPFOCovMat[ 6 ] ) ) ); ++n_NewPFOS2trk_NormalizedResidualPxE;
+					int NewPFO_SignNormResi7 = ( newResiduals[ 1 ] * newResiduals[ 3 ] / newPFOCovMat[ 7 ] >= 0 ? 1 : -1 );
+					h_NewPFOS2trk_NormalizedResidualPyE->Fill( NewPFO_SignNormResi7 * sqrt( fabs( newResiduals[ 1 ] ) * fabs( newResiduals[ 3 ] ) / fabs( newPFOCovMat[ 7 ] ) ) ); ++n_NewPFOS2trk_NormalizedResidualPyE;
+					int NewPFO_SignNormResi8 = ( newResiduals[ 2 ] * newResiduals[ 3 ] / newPFOCovMat[ 6 ] >= 0 ? 1 : -1 );
+					h_NewPFOS2trk_NormalizedResidualPzE->Fill( NewPFO_SignNormResi8 * sqrt( fabs( newResiduals[ 2 ] ) * fabs( newResiduals[ 3 ] ) / fabs( newPFOCovMat[ 8 ] ) ) ); ++n_NewPFOS2trk_NormalizedResidualPzE;
+					h_NewPFOS2trk_NormalizedResidualE->Fill( newResiduals[ 3 ] / sqrt( newPFOCovMat[ 9 ] ) ); ++n_NewPFOS2trk_NormalizedResidualE;
+					h_NewPFOS2trk_NormalizedResidualTheta->Fill( newResiduals[ 4 ] / newAngularUncertainties[ 0 ] ); ++n_NewPFOS2trk_NormalizedResidualTheta;
+					h_NewPFOS2trk_NormalizedResidualPhi->Fill( newResiduals[ 5 ] / newAngularUncertainties[ 1 ] ); ++n_NewPFOS2trk_NormalizedResidualPhi;
+				}
+			}
 			outputPfoCollection->addElement( outputPFO );
 		}
 
@@ -519,6 +805,7 @@ int ChargedPFOCorrection::getTruthTrkID( EVENT::LCEvent *pLCEvent , EVENT::Track
 			}
 		}
 	}
+	if ( TrackID != 0 ) m_TrkToMCPLinkWeight.push_back( maxweightTRKtoMCP );
 	return TrackID;
 }
 
@@ -845,6 +1132,68 @@ void ChargedPFOCorrection::updatePFO( EVENT::ReconstructedParticle* inputPFO , R
 	outputPFO->setStartVertex( inputPFO->getStartVertex() );
 }
 
+std::vector<float> ChargedPFOCorrection::getAngularUncertainties( TLorentzVector pfoFourMomentum , std::vector<float> pfoCovMat )
+{
+	std::vector<float> AngularUncertainties{};
+	float Px	= pfoFourMomentum.Px();
+	float Py	= pfoFourMomentum.Py();
+	float Pz	= pfoFourMomentum.Pz();
+//	float E		= pfoFourMomentum.E();
+	float P2	= pow( Px , 2 ) + pow( Py , 2 ) + pow( Pz , 2 );
+	float Pt2	= pow( Px , 2 ) + pow( Py , 2 );
+	float Pt	= sqrt( pow( Px , 2 ) + pow( Py , 2 ) );
+	float SigPx2	= pfoCovMat[0];
+	float SigPxPy	= pfoCovMat[1];
+	float SigPy2	= pfoCovMat[2];
+	float SigPxPz	= pfoCovMat[3];
+	float SigPyPz	= pfoCovMat[4];
+	float SigPz2	= pfoCovMat[5];
+//	float SigPxE	= pfoCovMat[6];
+//	float SigPyE	= pfoCovMat[7];
+//	float SigPzE	= pfoCovMat[8];
+//	float SigE2	= pfoCovMat[9];
+
+	float dth_dpx	= Px * Pz / ( P2 * Pt );
+	float dth_dpy	= Py * Pz / ( P2 * Pt );
+	float dth_dpz	= -Pt / P2;
+
+	float dphi_dpx	= -Py / Pt2;
+	float dphi_dpy	= Px / Pt2;
+
+	float SigmaTheta= std::sqrt( std::fabs( SigPx2 * std::pow( dth_dpx , 2 ) + SigPy2 * std::pow( dth_dpy , 2 ) + SigPz2 * std::pow( dth_dpz , 2 ) + 2 * ( SigPxPy * dth_dpx * dth_dpy ) + 2 * ( SigPyPz * dth_dpy * dth_dpz ) + 2 * ( SigPxPz * dth_dpx * dth_dpz ) ) );
+	float SigmaPhi	= std::sqrt( std::fabs( SigPx2 * std::pow( dphi_dpx , 2 ) + SigPy2 * std::pow( dphi_dpy , 2 ) + 2 * ( SigPxPy * dphi_dpx * dphi_dpy ) ) );
+
+	AngularUncertainties.push_back( SigmaTheta );
+	AngularUncertainties.push_back( SigmaPhi );
+	return AngularUncertainties;
+}
+
+void ChargedPFOCorrection::InitializeHistogram( TH1F *histogram , int scale , int color , int lineWidth , int markerSize , int markerStyle )
+{
+	histogram->Scale( 1.0 / scale );
+	histogram->SetLineColor( color );
+	histogram->SetLineWidth( lineWidth );
+	histogram->SetMarkerSize( markerSize );
+	histogram->SetMarkerStyle( markerStyle );
+	histogram->SetMarkerColor( color );
+	float fit_range = 2.0;
+	float fit_min = -2.0;
+	float fit_max = 2.0;
+	for ( int i_fit = 0 ; i_fit < 5 ; ++i_fit )
+	{
+		histogram->Fit( "gaus" , "" , "" , fit_min , fit_max );
+		TF1 *fitFunction = (TF1 *)histogram->GetFunction("gaus");
+		double fitMean = fitFunction->GetParameter( 1 );
+		double fitSigma = fitFunction->GetParameter( 2 );
+		fit_min = fitMean - fit_range * fitSigma;
+		fit_max = fitMean + fit_range * fitSigma;
+	}
+	histogram->GetFunction("gaus")->SetLineColor( color );
+	float y_max = 1.2 * histogram->GetMaximum();
+	histogram->GetYaxis()->SetRangeUser(0.0, y_max);
+	histogram->Write();
+}
+
 void ChargedPFOCorrection::check( EVENT::LCEvent *pLCEvent )
 {
 	LCCollection *inputPfoCollection{};
@@ -873,15 +1222,54 @@ void ChargedPFOCorrection::end()
 	h_InnermostRadiusHit_Neutral->Write();
 	h_InnermostRadiusHit_Charged->Write();
 	h_FirstSubDet_Charged->Write();
+	m_OldPFOs_1Trk->cd();
+	InitializeHistogram( h_OldPFOS1trk_NormalizedResidualPx , n_OldPFOS1trk_NormalizedResidualPx , 4 , 1 , 1.0 , 1 );
+	InitializeHistogram( h_OldPFOS1trk_NormalizedResidualPxPy , n_OldPFOS1trk_NormalizedResidualPxPy , 4 , 1 , 1.0 , 1 );
+	InitializeHistogram( h_OldPFOS1trk_NormalizedResidualPy , n_OldPFOS1trk_NormalizedResidualPy , 4 , 1 , 1.0 , 1 );
+	InitializeHistogram( h_OldPFOS1trk_NormalizedResidualPxPz , n_OldPFOS1trk_NormalizedResidualPxPz , 4 , 1 , 1.0 , 1 );
+	InitializeHistogram( h_OldPFOS1trk_NormalizedResidualPyPz , n_OldPFOS1trk_NormalizedResidualPyPz , 4 , 1 , 1.0 , 1 );
+	InitializeHistogram( h_OldPFOS1trk_NormalizedResidualPz , n_OldPFOS1trk_NormalizedResidualPz , 4 , 1 , 1.0 , 1 );
+	InitializeHistogram( h_OldPFOS1trk_NormalizedResidualPxE , n_OldPFOS1trk_NormalizedResidualPxE , 4 , 1 , 1.0 , 1 );
+	InitializeHistogram( h_OldPFOS1trk_NormalizedResidualPyE , n_OldPFOS1trk_NormalizedResidualPyE , 4 , 1 , 1.0 , 1 );
+	InitializeHistogram( h_OldPFOS1trk_NormalizedResidualPzE , n_OldPFOS1trk_NormalizedResidualPzE , 4 , 1 , 1.0 , 1 );
+	InitializeHistogram( h_OldPFOS1trk_NormalizedResidualE , n_OldPFOS1trk_NormalizedResidualE , 4 , 1 , 1.0 , 1 );
+	InitializeHistogram( h_OldPFOS1trk_NormalizedResidualTheta , n_OldPFOS1trk_NormalizedResidualTheta , 4 , 1 , 1.0 , 1 );
+	InitializeHistogram( h_OldPFOS1trk_NormalizedResidualPhi , n_OldPFOS1trk_NormalizedResidualPhi , 4 , 1 , 1.0 , 1 );
+	m_NewPFOs_1Trk->cd();
+	InitializeHistogram( h_NewPFOS1trk_NormalizedResidualPx , n_NewPFOS1trk_NormalizedResidualPx , 2 , 1 , 1.0 , 1 );
+	InitializeHistogram( h_NewPFOS1trk_NormalizedResidualPxPy , n_NewPFOS1trk_NormalizedResidualPxPy , 2 , 1 , 1.0 , 1 );
+	InitializeHistogram( h_NewPFOS1trk_NormalizedResidualPy , n_NewPFOS1trk_NormalizedResidualPy , 2 , 1 , 1.0 , 1 );
+	InitializeHistogram( h_NewPFOS1trk_NormalizedResidualPxPz , n_NewPFOS1trk_NormalizedResidualPxPz , 2 , 1 , 1.0 , 1 );
+	InitializeHistogram( h_NewPFOS1trk_NormalizedResidualPyPz , n_NewPFOS1trk_NormalizedResidualPyPz , 2 , 1 , 1.0 , 1 );
+	InitializeHistogram( h_NewPFOS1trk_NormalizedResidualPz , n_NewPFOS1trk_NormalizedResidualPz , 2 , 1 , 1.0 , 1 );
+	InitializeHistogram( h_NewPFOS1trk_NormalizedResidualPxE , n_NewPFOS1trk_NormalizedResidualPxE , 2 , 1 , 1.0 , 1 );
+	InitializeHistogram( h_NewPFOS1trk_NormalizedResidualPyE , n_NewPFOS1trk_NormalizedResidualPyE , 2 , 1 , 1.0 , 1 );
+	InitializeHistogram( h_NewPFOS1trk_NormalizedResidualPzE , n_NewPFOS1trk_NormalizedResidualPzE , 2 , 1 , 1.0 , 1 );
+	InitializeHistogram( h_NewPFOS1trk_NormalizedResidualE , n_NewPFOS1trk_NormalizedResidualE , 2 , 1 , 1.0 , 1 );
+	InitializeHistogram( h_NewPFOS1trk_NormalizedResidualTheta , n_NewPFOS1trk_NormalizedResidualTheta , 2 , 1 , 1.0 , 1 );
+	InitializeHistogram( h_NewPFOS1trk_NormalizedResidualPhi , n_NewPFOS1trk_NormalizedResidualPhi , 2 , 1 , 1.0 , 1 );
+	m_NewPFOs_2Trk->cd();
+	InitializeHistogram( h_NewPFOS2trk_NormalizedResidualPx , n_NewPFOS2trk_NormalizedResidualPx , 6 , 1 , 1.0 , 1 );
+	InitializeHistogram( h_NewPFOS2trk_NormalizedResidualPxPy , n_NewPFOS2trk_NormalizedResidualPxPy , 6 , 1 , 1.0 , 1 );
+	InitializeHistogram( h_NewPFOS2trk_NormalizedResidualPy , n_NewPFOS2trk_NormalizedResidualPy , 6 , 1 , 1.0 , 1 );
+	InitializeHistogram( h_NewPFOS2trk_NormalizedResidualPxPz , n_NewPFOS2trk_NormalizedResidualPxPz , 6 , 1 , 1.0 , 1 );
+	InitializeHistogram( h_NewPFOS2trk_NormalizedResidualPyPz , n_NewPFOS2trk_NormalizedResidualPyPz , 6 , 1 , 1.0 , 1 );
+	InitializeHistogram( h_NewPFOS2trk_NormalizedResidualPz , n_NewPFOS2trk_NormalizedResidualPz , 6 , 1 , 1.0 , 1 );
+	InitializeHistogram( h_NewPFOS2trk_NormalizedResidualPxE , n_NewPFOS2trk_NormalizedResidualPxE , 6 , 1 , 1.0 , 1 );
+	InitializeHistogram( h_NewPFOS2trk_NormalizedResidualPyE , n_NewPFOS2trk_NormalizedResidualPyE , 6 , 1 , 1.0 , 1 );
+	InitializeHistogram( h_NewPFOS2trk_NormalizedResidualPzE , n_NewPFOS2trk_NormalizedResidualPzE , 6 , 1 , 1.0 , 1 );
+	InitializeHistogram( h_NewPFOS2trk_NormalizedResidualE , n_NewPFOS2trk_NormalizedResidualE , 6 , 1 , 1.0 , 1 );
+	InitializeHistogram( h_NewPFOS2trk_NormalizedResidualTheta , n_NewPFOS2trk_NormalizedResidualTheta , 6 , 1 , 1.0 , 1 );
+	InitializeHistogram( h_NewPFOS2trk_NormalizedResidualPhi , n_NewPFOS2trk_NormalizedResidualPhi , 6 , 1 , 1.0 , 1 );
 	m_pTFile->Close();
 	delete m_pTFile;
 
-	std::cout << "" << std::endl;
+	streamlog_out(MESSAGE) << " " << std::endl;
 	streamlog_out(MESSAGE) << "	////////////////////////////////////////////////////////////////////////////" << std::endl;
 	streamlog_out(MESSAGE) << "	////////////////////////////////////////////////////////////////////////////" << std::endl;
 	streamlog_out(MESSAGE) << "	////////////////////	processed events: 	" << m_nEvtSum << "	////////////////////" << std::endl;
 	streamlog_out(MESSAGE) << "	////////////////////////////////////////////////////////////////////////////" << std::endl;
 	streamlog_out(MESSAGE) << "	////////////////////////////////////////////////////////////////////////////" << std::endl;
-	std::cout << "" << std::endl;
+	streamlog_out(MESSAGE) << " " << std::endl;
 
 }
