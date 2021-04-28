@@ -23,6 +23,8 @@
 #include "TLorentzVector.h"
 #include "TVector3.h"
 #include "TMatrixD.h"
+#include "TStyle.h"
+#include "TCanvas.h"
 
 class TFile;
 class TDirectory;
@@ -62,6 +64,8 @@ class ChargedPFOCorrection : public Processor
 		std::vector<float> getAngularUncertainties( TLorentzVector pfoFourMomentum , std::vector<float> pfoCovMat );
 //		virtual void InitializeHistogram( TH1F *histogram , std::int scale , std::int color , std::int lineWidth , std::int markerSize , std::int markerStyle );
 		virtual void InitializeHistogram( TH1F *histogram , int scale , int color , int lineWidth , int markerSize , int markerStyle );
+		virtual void doProperGaussianFit( TH1F *histogram , float fitMin , float fitMax , float fitRange );
+		virtual void MakeRatioPlots( TCanvas *Canvas , TH1F *histogram1 , TH1F *histogram2 , int scale1 , int scale2 , int color1 , int color2 , float Ratio_min , float Ratio_max , float XTitleSize , float XTitleOffset );
 		virtual void check( EVENT::LCEvent *pLCEvent );
 		virtual void end();
 
@@ -127,6 +131,7 @@ class ChargedPFOCorrection : public Processor
 		int					n_NewPFOS2trk_NormalizedResidualE;
 		int					n_NewPFOS2trk_NormalizedResidualTheta;
 		int					n_NewPFOS2trk_NormalizedResidualPhi;
+		int					n_TrueProtonLinkWeight;
 		int					n_StdTrkProton_NormalizedResidualPx;
 		int					n_StdTrkProton_NormalizedResidualPxPy;
 		int					n_StdTrkProton_NormalizedResidualPy;
@@ -151,6 +156,7 @@ class ChargedPFOCorrection : public Processor
 		int					n_RFTrkProton_NormalizedResidualE;
 		int					n_RFTrkProton_NormalizedResidualTheta;
 		int					n_RFTrkProton_NormalizedResidualPhi;
+		int					n_TrueKaonLinkWeight;
 		int					n_StdTrkKaon_NormalizedResidualPx;
 		int					n_StdTrkKaon_NormalizedResidualPxPy;
 		int					n_StdTrkKaon_NormalizedResidualPy;
@@ -256,6 +262,7 @@ class ChargedPFOCorrection : public Processor
 		TTree					*m_pTTree_2trk{};
 		TTree					*m_pTTree_ntrk{};
 		TDirectory				*m_Histograms{};
+		TDirectory				*m_Plots{};
 		TDirectory				*m_OldPFOs_1Trk{};
 		TDirectory				*m_NewPFOs_1Trk{};
 		TDirectory				*m_NewPFOs_2Trk{};
@@ -263,6 +270,42 @@ class ChargedPFOCorrection : public Processor
 		TDirectory				*m_TrueProtons_1Trk{};
 		TDirectory				*m_TrueKaons_1Trk{};
 		TDirectory				*m_IndividualTracks_2Trk{};
+		TCanvas					*c_1trk_NormalizedResidualPx{};
+		TCanvas					*c_1trk_NormalizedResidualPxPy{};
+		TCanvas					*c_1trk_NormalizedResidualPy{};
+		TCanvas					*c_1trk_NormalizedResidualPxPz{};
+		TCanvas					*c_1trk_NormalizedResidualPyPz{};
+		TCanvas					*c_1trk_NormalizedResidualPz{};
+		TCanvas					*c_1trk_NormalizedResidualPxE{};
+		TCanvas					*c_1trk_NormalizedResidualPyE{};
+		TCanvas					*c_1trk_NormalizedResidualPzE{};
+		TCanvas					*c_1trk_NormalizedResidualE{};
+		TCanvas					*c_1trk_NormalizedResidualTheta{};
+		TCanvas					*c_1trk_NormalizedResidualPhi{};
+		TCanvas					*c_Protons_NormalizedResidualPx{};
+		TCanvas					*c_Protons_NormalizedResidualPxPy{};
+		TCanvas					*c_Protons_NormalizedResidualPy{};
+		TCanvas					*c_Protons_NormalizedResidualPxPz{};
+		TCanvas					*c_Protons_NormalizedResidualPyPz{};
+		TCanvas					*c_Protons_NormalizedResidualPz{};
+		TCanvas					*c_Protons_NormalizedResidualPxE{};
+		TCanvas					*c_Protons_NormalizedResidualPyE{};
+		TCanvas					*c_Protons_NormalizedResidualPzE{};
+		TCanvas					*c_Protons_NormalizedResidualE{};
+		TCanvas					*c_Protons_NormalizedResidualTheta{};
+		TCanvas					*c_Protons_NormalizedResidualPhi{};
+		TCanvas					*c_Kaons_NormalizedResidualPx{};
+		TCanvas					*c_Kaons_NormalizedResidualPxPy{};
+		TCanvas					*c_Kaons_NormalizedResidualPy{};
+		TCanvas					*c_Kaons_NormalizedResidualPxPz{};
+		TCanvas					*c_Kaons_NormalizedResidualPyPz{};
+		TCanvas					*c_Kaons_NormalizedResidualPz{};
+		TCanvas					*c_Kaons_NormalizedResidualPxE{};
+		TCanvas					*c_Kaons_NormalizedResidualPyE{};
+		TCanvas					*c_Kaons_NormalizedResidualPzE{};
+		TCanvas					*c_Kaons_NormalizedResidualE{};
+		TCanvas					*c_Kaons_NormalizedResidualTheta{};
+		TCanvas					*c_Kaons_NormalizedResidualPhi{};
 		TH2I					*h_nClusters_nTracks{};
 		TH2I					*h_pfoCharge_nTracks{};
 		TH2F					*h_InnermostRadiusHit_Neutral{};
@@ -280,6 +323,12 @@ class ChargedPFOCorrection : public Processor
 		TH1F					*h_OldPFOS1trk_NormalizedResidualE{};
 		TH1F					*h_OldPFOS1trk_NormalizedResidualTheta{};
 		TH1F					*h_OldPFOS1trk_NormalizedResidualPhi{};
+		TH2F					*h_OldPFOS1trk_ResidualPxPy{};
+		TH2F					*h_OldPFOS1trk_ResidualPxPz{};
+		TH2F					*h_OldPFOS1trk_ResidualPyPz{};
+		TH2F					*h_OldPFOS1trk_ResidualPxE{};
+		TH2F					*h_OldPFOS1trk_ResidualPyE{};
+		TH2F					*h_OldPFOS1trk_ResidualPzE{};
 		TH1F					*h_NewPFOS1trk_NormalizedResidualPx{};
 		TH1F					*h_NewPFOS1trk_NormalizedResidualPxPy{};
 		TH1F					*h_NewPFOS1trk_NormalizedResidualPy{};
@@ -292,6 +341,12 @@ class ChargedPFOCorrection : public Processor
 		TH1F					*h_NewPFOS1trk_NormalizedResidualE{};
 		TH1F					*h_NewPFOS1trk_NormalizedResidualTheta{};
 		TH1F					*h_NewPFOS1trk_NormalizedResidualPhi{};
+		TH2F					*h_NewPFOS1trk_ResidualPxPy{};
+		TH2F					*h_NewPFOS1trk_ResidualPxPz{};
+		TH2F					*h_NewPFOS1trk_ResidualPyPz{};
+		TH2F					*h_NewPFOS1trk_ResidualPxE{};
+		TH2F					*h_NewPFOS1trk_ResidualPyE{};
+		TH2F					*h_NewPFOS1trk_ResidualPzE{};
 		TH1F					*h_NewPFOS2trk_NormalizedResidualPx{};
 		TH1F					*h_NewPFOS2trk_NormalizedResidualPxPy{};
 		TH1F					*h_NewPFOS2trk_NormalizedResidualPy{};
@@ -304,6 +359,13 @@ class ChargedPFOCorrection : public Processor
 		TH1F					*h_NewPFOS2trk_NormalizedResidualE{};
 		TH1F					*h_NewPFOS2trk_NormalizedResidualTheta{};
 		TH1F					*h_NewPFOS2trk_NormalizedResidualPhi{};
+		TH2F					*h_NewPFOS2trk_ResidualPxPy{};
+		TH2F					*h_NewPFOS2trk_ResidualPxPz{};
+		TH2F					*h_NewPFOS2trk_ResidualPyPz{};
+		TH2F					*h_NewPFOS2trk_ResidualPxE{};
+		TH2F					*h_NewPFOS2trk_ResidualPyE{};
+		TH2F					*h_NewPFOS2trk_ResidualPzE{};
+		TH1F					*h_TrueProtonLinkWeight{};
 		TH1F					*h_StdTrkProton_NormalizedResidualPx{};
 		TH1F					*h_StdTrkProton_NormalizedResidualPxPy{};
 		TH1F					*h_StdTrkProton_NormalizedResidualPy{};
@@ -316,6 +378,12 @@ class ChargedPFOCorrection : public Processor
 		TH1F					*h_StdTrkProton_NormalizedResidualE{};
 		TH1F					*h_StdTrkProton_NormalizedResidualTheta{};
 		TH1F					*h_StdTrkProton_NormalizedResidualPhi{};
+		TH2F					*h_StdTrkProton_ResidualPxPy{};
+		TH2F					*h_StdTrkProton_ResidualPxPz{};
+		TH2F					*h_StdTrkProton_ResidualPyPz{};
+		TH2F					*h_StdTrkProton_ResidualPxE{};
+		TH2F					*h_StdTrkProton_ResidualPyE{};
+		TH2F					*h_StdTrkProton_ResidualPzE{};
 		TH1F					*h_RFTrkProton_NormalizedResidualPx{};
 		TH1F					*h_RFTrkProton_NormalizedResidualPxPy{};
 		TH1F					*h_RFTrkProton_NormalizedResidualPy{};
@@ -328,6 +396,13 @@ class ChargedPFOCorrection : public Processor
 		TH1F					*h_RFTrkProton_NormalizedResidualE{};
 		TH1F					*h_RFTrkProton_NormalizedResidualTheta{};
 		TH1F					*h_RFTrkProton_NormalizedResidualPhi{};
+		TH2F					*h_RFTrkProton_ResidualPxPy{};
+		TH2F					*h_RFTrkProton_ResidualPxPz{};
+		TH2F					*h_RFTrkProton_ResidualPyPz{};
+		TH2F					*h_RFTrkProton_ResidualPxE{};
+		TH2F					*h_RFTrkProton_ResidualPyE{};
+		TH2F					*h_RFTrkProton_ResidualPzE{};
+		TH1F					*h_TrueKaonLinkWeight{};
 		TH1F					*h_StdTrkKaon_NormalizedResidualPx{};
 		TH1F					*h_StdTrkKaon_NormalizedResidualPxPy{};
 		TH1F					*h_StdTrkKaon_NormalizedResidualPy{};
@@ -340,6 +415,12 @@ class ChargedPFOCorrection : public Processor
 		TH1F					*h_StdTrkKaon_NormalizedResidualE{};
 		TH1F					*h_StdTrkKaon_NormalizedResidualTheta{};
 		TH1F					*h_StdTrkKaon_NormalizedResidualPhi{};
+		TH2F					*h_StdTrkKaon_ResidualPxPy{};
+		TH2F					*h_StdTrkKaon_ResidualPxPz{};
+		TH2F					*h_StdTrkKaon_ResidualPyPz{};
+		TH2F					*h_StdTrkKaon_ResidualPxE{};
+		TH2F					*h_StdTrkKaon_ResidualPyE{};
+		TH2F					*h_StdTrkKaon_ResidualPzE{};
 		TH1F					*h_RFTrkKaon_NormalizedResidualPx{};
 		TH1F					*h_RFTrkKaon_NormalizedResidualPxPy{};
 		TH1F					*h_RFTrkKaon_NormalizedResidualPy{};
@@ -352,6 +433,12 @@ class ChargedPFOCorrection : public Processor
 		TH1F					*h_RFTrkKaon_NormalizedResidualE{};
 		TH1F					*h_RFTrkKaon_NormalizedResidualTheta{};
 		TH1F					*h_RFTrkKaon_NormalizedResidualPhi{};
+		TH2F					*h_RFTrkKaon_ResidualPxPy{};
+		TH2F					*h_RFTrkKaon_ResidualPxPz{};
+		TH2F					*h_RFTrkKaon_ResidualPyPz{};
+		TH2F					*h_RFTrkKaon_ResidualPxE{};
+		TH2F					*h_RFTrkKaon_ResidualPyE{};
+		TH2F					*h_RFTrkKaon_ResidualPzE{};
 		TH1F					*h_StdTrk_NormalizedResidualPx{};
 		TH1F					*h_StdTrk_NormalizedResidualPxPy{};
 		TH1F					*h_StdTrk_NormalizedResidualPy{};
