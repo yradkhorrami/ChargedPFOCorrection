@@ -862,15 +862,16 @@ void ChargedPFOCorrection::processEvent( EVENT::LCEvent *pLCEvent )
 				foundLinkedMCP = false;
 				m_updatePFO = false;
 			}
+			int pfoType = ( nTRKsofPFO == 1 ? TrackID : inputPFO->getType() );
 			if( m_updatePFO )
 			{
-				this->updatePFO( inputPFO , outputPFO , outputPFOtrkvec , pfoFourMomentum , newPFOCovMat );
+				this->updatePFO( inputPFO , outputPFO , outputPFOtrkvec , pfoFourMomentum , newPFOCovMat , pfoType );
 				m_newPFO_Px.push_back( pfoFourMomentum.Px() );		m_newPFO_Py.push_back( pfoFourMomentum.Py() );		m_newPFO_Pz.push_back( pfoFourMomentum.Pz() );
 				m_newPFO_E.push_back( pfoFourMomentum.E() );		m_newPFO_Theta.push_back( pfoFourMomentum.Theta() );	m_newPFO_Phi.push_back( pfoFourMomentum.Phi() );
 			}
 			else
 			{
-				this->updatePFO( inputPFO , outputPFO , inputPFOtrkvec , oldpfoFourMomentum , oldPFOCovMat );
+				this->updatePFO( inputPFO , outputPFO , inputPFOtrkvec , oldpfoFourMomentum , oldPFOCovMat , pfoType );
 				m_newPFO_Px.push_back( oldpfoFourMomentum.Px() );	m_newPFO_Py.push_back( oldpfoFourMomentum.Py() );	m_newPFO_Pz.push_back( oldpfoFourMomentum.Pz() );
 				m_newPFO_E.push_back( oldpfoFourMomentum.E() );		m_newPFO_Theta.push_back( oldpfoFourMomentum.Theta() );	m_newPFO_Phi.push_back( oldpfoFourMomentum.Phi() );
 			}
@@ -1501,12 +1502,12 @@ std::vector<float> ChargedPFOCorrection::UpdateChargedPFOCovMat( EVENT::Track* i
 
 }
 
-void ChargedPFOCorrection::updatePFO( EVENT::ReconstructedParticle* inputPFO , ReconstructedParticleImpl* outputPFO , std::vector<Track*> outputPFOtrkvec , TLorentzVector pfoFourMomentum , std::vector<float> pfoCovMat )
+void ChargedPFOCorrection::updatePFO( EVENT::ReconstructedParticle* inputPFO , ReconstructedParticleImpl* outputPFO , std::vector<Track*> outputPFOtrkvec , TLorentzVector pfoFourMomentum , std::vector<float> pfoCovMat , int pfoType )
 {
 	double Momentum[3]{ pfoFourMomentum.Px() , pfoFourMomentum.Py() , pfoFourMomentum.Pz() };
 	double Energy = pfoFourMomentum.E();
 	double Mass = pfoFourMomentum.M();
-	outputPFO->setType(inputPFO->getType());
+	outputPFO->setType( pfoType );
 	outputPFO->setMomentum( Momentum );
 	outputPFO->setEnergy( Energy );
 	outputPFO->setCovMatrix( pfoCovMat );

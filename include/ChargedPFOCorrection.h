@@ -60,7 +60,7 @@ class ChargedPFOCorrection : public Processor
 		TLorentzVector getTrackFourMomentum( EVENT::Track* inputTrk , double trackMass );
 		std::vector<float> getPFOResidual( TLorentzVector pfoFourMomentum , TLorentzVector mcpFourMomentum );
 		std::vector<float> UpdateChargedPFOCovMat( EVENT::Track* inputTrk , float trackMass );
-		virtual void updatePFO( EVENT::ReconstructedParticle* inputPFO , ReconstructedParticleImpl* outputPFO , std::vector<Track*> outputPFOtrkvec , TLorentzVector pfoFourMomentum , std::vector<float> pfoCovMat );
+		virtual void updatePFO( EVENT::ReconstructedParticle* inputPFO , ReconstructedParticleImpl* outputPFO , std::vector<Track*> outputPFOtrkvec , TLorentzVector pfoFourMomentum , std::vector<float> pfoCovMat , int pfoType );
 		std::vector<float> getAngularUncertainties( TLorentzVector pfoFourMomentum , std::vector<float> pfoCovMat );
 //		virtual void InitializeHistogram( TH1F *histogram , std::int scale , std::int color , std::int lineWidth , std::int markerSize , std::int markerStyle );
 		virtual void InitializeHistogram( TH1F *histogram , int scale , int color , int lineWidth , int markerSize , int markerStyle );
