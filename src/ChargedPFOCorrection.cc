@@ -275,7 +275,7 @@ ChargedPFOCorrection::ChargedPFOCorrection() :
 	registerProcessorParameter(	"fillRootTree",
 					"Fill root tree to check processor performance",
 					m_fillRootTree,
-					bool(true)
+					bool(false)
 				);
 
 	registerProcessorParameter(	"RootFile",
@@ -306,7 +306,6 @@ void ChargedPFOCorrection::init()
 	pion_mass = 0.13957018;
 */
 	m_pTFile = new TFile(m_rootFile.c_str(), "recreate");
-
 	m_pTTree = new TTree("PFOswithRFT", "PFOswithRFT");
 	m_pTTree->SetDirectory(m_pTFile);
 	m_pTTree->Branch("run", &m_nRun, "run/I");
@@ -552,6 +551,7 @@ void ChargedPFOCorrection::init()
 	h_RFTrk_NormalizedResidualE = new TH1F( "Individual Tracks (refitted Track)" , "; (_{}E^{REC} - E^{MC}) / #sigma_{E}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_RFTrk_NormalizedResidualE = 0;
 	h_RFTrk_NormalizedResidualTheta = new TH1F( "Individual Tracks (refitted Track)" , "; (_{}#theta^{REC} - #theta^{MC}) / #sigma_{#theta}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_RFTrk_NormalizedResidualTheta = 0;
 	h_RFTrk_NormalizedResidualPhi = new TH1F( "Individual Tracks (refitted Track)" , "; (_{}#phi^{REC} - #phi^{MC}) / #sigma_{#phi}; Normalized Entries / 0.1" , 200 , -10.0 , 10.0 ); n_RFTrk_NormalizedResidualPhi = 0;
+
 }
 
 void ChargedPFOCorrection::Clear()

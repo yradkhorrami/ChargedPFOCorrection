@@ -89,7 +89,7 @@ class ChargedPFOCorrection : public Processor
 		bool					m_updatePFOwithTwoTrack = true;
 		bool					m_updatePFOwithMoreTrack = true;
 		bool					m_updatePFOwithPionTrack = true;
-		bool					m_fillRootTree = true;
+		bool					m_fillRootTree = false;
 
 		int					m_nRun;
 		int					m_nEvt;
