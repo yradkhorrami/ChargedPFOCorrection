@@ -335,6 +335,7 @@ void ChargedPFOCorrection::processEvent( EVENT::LCEvent *pLCEvent )
 				outputPFO->setCovMatrix( newPFOCovMat );
 				outputPFO->setMass( Mass );
 			}
+			outputPfoCollection->addElement( outputPFO );
 		}
 		pLCEvent->addCollection( outputPfoCollection , m_outputPfoCollection );
 	}
