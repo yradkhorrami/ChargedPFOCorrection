@@ -78,7 +78,7 @@ class ChargedPFOCorrection : public Processor
 		bool					m_updatePFOwithOneTrack = true;
 		bool					m_updatePFOwithTwoTrack = true;
 		bool					m_updatePFOwithMoreTrack = true;
-		bool					m_updatePFOwithPionTrack = true;
+		bool					m_updatePFOwithPionTrack = false;
 
 		float					m_Bfield;
 		double					c;

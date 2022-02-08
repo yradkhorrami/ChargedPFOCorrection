@@ -214,13 +214,13 @@ void ChargedPFOCorrection::processEvent( EVENT::LCEvent *pLCEvent )
 
 		for (int i_pfo = 0; i_pfo < n_PFO ; ++i_pfo)
 		{
+			ReconstructedParticleImpl* outputPFO = dynamic_cast<ReconstructedParticleImpl*>( inputPfoCollection->getElementAt( i_pfo ) );
 			double trackMass = 0.0;
-			int TrackID = 0;
+			int TrackID = outputPFO->getType();
 			int TrackIndex = -1;
 			std::vector<float> newPFOCovMat( 10, 0.0 );
 			std::vector<float> trackFourMomentumCovMat( 10, 0.0 );
 			bool m_updatePFO = false;
-			ReconstructedParticleImpl* outputPFO = dynamic_cast<ReconstructedParticleImpl*>( inputPfoCollection->getElementAt( i_pfo ) );
 			TLorentzVector pfoFourMomentum( 0.0 , 0.0 , 0.0 , 0.0 );
 			const EVENT::TrackVec& inputPFOtrkvec = outputPFO->getTracks();
 			Track *refittedTrack = NULL;
