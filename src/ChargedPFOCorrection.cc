@@ -314,7 +314,71 @@ void ChargedPFOCorrection::processEvent( EVENT::LCEvent *pLCEvent )
 				}
 				else
 				{
-					m_updatePFO = false;
+					float radiusInnerMostHit = 10000.0;
+					Track *mainTrk = NULL;
+					for ( int i_trk = 0 ; i_trk < nTRKsofPFO ; ++i_trk )
+					{
+						Track *inputTrk = (Track*)inputPFOtrkvec.at( i_trk );
+						TrackID = getTruthTrkID( pLCEvent, inputTrk );
+						TrackIndex = this->getTrackIndex( MarlinTrkTracks , inputTrk );
+						streamlog_out(DEBUG5) << "	Investigating track " << i_trk << " of PFO" << std::endl;
+						streamlog_out(DEBUG5) << *inputTrk << std::endl;
+						if ( abs( TrackID ) == 2212 )
+						{
+							refittedTrack = dynamic_cast<EVENT::Track*>( MarlinTrkTracksPROTON->getElementAt( TrackIndex ) );
+							outputPFOtrkvec.push_back( refittedTrack );
+							m_updatePFO = true;
+							streamlog_out(DEBUG2) << "	Standard track is replaced with track refitted with proton mass" << std::endl;
+						}
+						else if ( abs( TrackID ) == 321 )
+						{
+							refittedTrack = dynamic_cast<EVENT::Track*>( MarlinTrkTracksKAON->getElementAt( TrackIndex ) );
+							outputPFOtrkvec.push_back( refittedTrack );
+							m_updatePFO = true;
+							streamlog_out(DEBUG2) << "	Standard track is replaced with track refitted with kaon mass" << std::endl;
+						}
+						else
+						{
+							refittedTrack = inputTrk;
+							outputPFOtrkvec.push_back( refittedTrack );
+							if ( !m_updatePFO ) m_updatePFO = false;
+							streamlog_out(DEBUG2) << "	Standard track is used for updating PFO" << std::endl;
+						}
+						if ( refittedTrack->getRadiusOfInnermostHit() <= radiusInnerMostHit )
+						{
+							mainTrk = inputTrk;
+							radiusInnerMostHit = inputTrk->getRadiusOfInnermostHit();
+						}
+					}
+					streamlog_out(DEBUG5) << "	Main track of PFO" << std::endl;
+					streamlog_out(DEBUG5) << *mainTrk << std::endl;
+					TrackID = getTruthTrkID( pLCEvent, mainTrk );
+					TrackIndex = this->getTrackIndex( MarlinTrkTracks , mainTrk );
+					streamlog_out(DEBUG6) << "	TrackID: 	" << TrackID << std::endl;
+					streamlog_out(DEBUG6) << "	TrackIndex: 	" << TrackIndex << std::endl;
+					if ( abs( TrackID ) == 2212 )
+					{
+						mainTrk = dynamic_cast<EVENT::Track*>( MarlinTrkTracksPROTON->getElementAt( TrackIndex ) );
+						trackMass = m_proton_mass;
+						m_updatePFO = true;
+						streamlog_out(DEBUG2) << "	Standard track is replaced with track refitted with proton mass" << std::endl;
+					}
+					else if ( abs( TrackID ) == 321 )
+					{
+						mainTrk = dynamic_cast<EVENT::Track*>( MarlinTrkTracksKAON->getElementAt( TrackIndex ) );
+						trackMass = m_kaon_mass;
+						m_updatePFO = true;
+						streamlog_out(DEBUG2) << "	Standard track is replaced with track refitted with kaon mass" << std::endl;
+					}
+					else
+					{
+						trackMass = m_pion_mass;
+						m_updatePFO = false;
+						streamlog_out(DEBUG2) << "	Standard track is used for updating PFO" << std::endl;
+					}
+					pfoFourMomentum = getTrackFourMomentum( mainTrk , trackMass );
+					newPFOCovMat = getChargedPFOCovMat( mainTrk , trackMass );
+//					m_updatePFO = false;
 				}
 			}
 			else
@@ -322,7 +386,7 @@ void ChargedPFOCorrection::processEvent( EVENT::LCEvent *pLCEvent )
 				m_updatePFO = false;
 			}
 
-			int pfoType = ( nTRKsofPFO == 1 ? TrackID : outputPFO->getType() );
+			int pfoType = ( nTRKsofPFO == 1 || fabs( outputPFO->getCharge() ) >=0.5 ? TrackID : outputPFO->getType() );
 
 			double Momentum[3]{ pfoFourMomentum.Px() , pfoFourMomentum.Py() , pfoFourMomentum.Pz() };
 			double Energy = pfoFourMomentum.E();

@@ -14,6 +14,7 @@
 #include <EVENT/Track.h>
 #include "IMPL/LCCollectionVec.h"
 #include <IMPL/ReconstructedParticleImpl.h>
+#include "DDMarlinCED.h"
 #include "lcio.h"
 #include <string>
 #include <vector>
