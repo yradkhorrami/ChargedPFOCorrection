@@ -76,10 +76,12 @@ class ChargedPFOCorrection : public Processor
 		std::string				m_MCTruthTrackLinkCollection{};
 		std::string				m_outputPfoCollection{};
 
+		bool					m_updatePFOs = true;
 		bool					m_updatePFOwithOneTrack = true;
 		bool					m_updatePFOwithTwoTrack = true;
 		bool					m_updatePFOwithMoreTrack = true;
 		bool					m_updatePFOwithPionTrack = false;
+		int					m_mainTrackSelectionScenario = 1;
 
 		float					m_Bfield;
 		double					c;

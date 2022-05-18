@@ -94,7 +94,13 @@ m_kaon_mass(0.493677)
 					"updatedPfoCollection",
 					"Name of output pfo collection",
 					m_outputPfoCollection,
-					std::string("updatedPfoCollection")
+					std::string("updatedChargedPFOs")
+				);
+
+	registerProcessorParameter(	"updatePFOs",
+					"Update PFOs? true update PFO collection , false: make new PFO collection",
+					m_updatePFOs,
+					bool(true)
 				);
 
 	registerProcessorParameter(	"updatePFOwithOneTrack",
@@ -107,6 +113,12 @@ m_kaon_mass(0.493677)
 					"Update PFOs with two track.",
 					m_updatePFOwithTwoTrack,
 					bool(true)
+				);
+
+	registerProcessorParameter(	"mainTrackSelectionScenario",
+					"Scenario for chossing main track in Charged PFOs with two track: 1: track with lowes radius of inner most hit , 2: track with lowset 3D impaxt parameter , any: track with highest magnitude of momentum",
+					m_mainTrackSelectionScenario,
+					int(1)
 				);
 
 	registerProcessorParameter(	"updatePFOwithMoreTrack",
@@ -180,7 +192,8 @@ void ChargedPFOCorrection::processEvent( EVENT::LCEvent *pLCEvent )
 	LCCollection *MarlinTrkTracksPROTON{};
 	IMPL::LCCollectionVec* outputPfoCollection(NULL);
 	outputPfoCollection = new IMPL::LCCollectionVec( LCIO::RECONSTRUCTEDPARTICLE );
-	outputPfoCollection->setSubset( true );
+//	outputPfoCollection->setSubset( true );
+//	if ( m_updatePFOs ) outputPfoCollection->setSubset( true );
 	int n_PFO = -1;
 	int n_TRK = -1;
 	int n_TRKp = -1;
@@ -215,6 +228,8 @@ void ChargedPFOCorrection::processEvent( EVENT::LCEvent *pLCEvent )
 		for (int i_pfo = 0; i_pfo < n_PFO ; ++i_pfo)
 		{
 			ReconstructedParticleImpl* outputPFO = dynamic_cast<ReconstructedParticleImpl*>( inputPfoCollection->getElementAt( i_pfo ) );
+			ReconstructedParticleImpl* newPFO = new ReconstructedParticleImpl;
+			int pfoType = outputPFO->getType();
 			double trackMass = 0.0;
 			int TrackID = outputPFO->getType();
 			int TrackIndex = -1;
@@ -315,7 +330,11 @@ void ChargedPFOCorrection::processEvent( EVENT::LCEvent *pLCEvent )
 				else
 				{
 					float radiusInnerMostHit = 10000.0;
+					float firstHitRef = 1000000.0;
+					float ImpactParameter3D = 1000000.0;
 					Track *mainTrk = NULL;
+					double mainTrkMass = 0.0;
+					int mainTrackID = 0;
 					for ( int i_trk = 0 ; i_trk < nTRKsofPFO ; ++i_trk )
 					{
 						Track *inputTrk = (Track*)inputPFOtrkvec.at( i_trk );
@@ -327,6 +346,7 @@ void ChargedPFOCorrection::processEvent( EVENT::LCEvent *pLCEvent )
 						{
 							refittedTrack = dynamic_cast<EVENT::Track*>( MarlinTrkTracksPROTON->getElementAt( TrackIndex ) );
 							outputPFOtrkvec.push_back( refittedTrack );
+							trackMass = m_proton_mass;
 							m_updatePFO = true;
 							streamlog_out(DEBUG2) << "	Standard track is replaced with track refitted with proton mass" << std::endl;
 						}
@@ -334,6 +354,7 @@ void ChargedPFOCorrection::processEvent( EVENT::LCEvent *pLCEvent )
 						{
 							refittedTrack = dynamic_cast<EVENT::Track*>( MarlinTrkTracksKAON->getElementAt( TrackIndex ) );
 							outputPFOtrkvec.push_back( refittedTrack );
+							trackMass = m_kaon_mass;
 							m_updatePFO = true;
 							streamlog_out(DEBUG2) << "	Standard track is replaced with track refitted with kaon mass" << std::endl;
 						}
@@ -341,17 +362,50 @@ void ChargedPFOCorrection::processEvent( EVENT::LCEvent *pLCEvent )
 						{
 							refittedTrack = inputTrk;
 							outputPFOtrkvec.push_back( refittedTrack );
+							trackMass = m_pion_mass;
 							if ( !m_updatePFO ) m_updatePFO = false;
 							streamlog_out(DEBUG2) << "	Standard track is used for updating PFO" << std::endl;
 						}
-						if ( refittedTrack->getRadiusOfInnermostHit() <= radiusInnerMostHit )
+						if ( m_mainTrackSelectionScenario == 1 )
 						{
-							mainTrk = inputTrk;
-							radiusInnerMostHit = inputTrk->getRadiusOfInnermostHit();
+							if ( refittedTrack->getRadiusOfInnermostHit() <= radiusInnerMostHit )
+							{
+								mainTrk = refittedTrack;
+								mainTrkMass = trackMass;
+								mainTrackID = TrackID;
+								radiusInnerMostHit = inputTrk->getRadiusOfInnermostHit();
+							}
+						}
+						else if ( m_mainTrackSelectionScenario == 2 )
+						{
+							if ( sqrt( pow( refittedTrack->getD0() , 2 ) + pow( refittedTrack->getZ0() , 2 ) ) <= ImpactParameter3D )
+							{
+								mainTrk = refittedTrack;
+								mainTrkMass = trackMass;
+								mainTrackID = TrackID;
+								ImpactParameter3D = sqrt( pow( refittedTrack->getD0() , 2 ) + pow( refittedTrack->getZ0() , 2 ) );
+							}
+						}
+						else
+						{
+							streamlog_out(DEBUG5) << "	Investigating track state at first hit" << std::endl;
+							TrackState *trackStateAtFirstHit = inputTrk->getTrackStates()[ 1 ];
+							streamlog_out(DEBUG5) << *trackStateAtFirstHit << std::endl;
+							if ( sqrt( pow( trackStateAtFirstHit->getReferencePoint()[ 0 ] , 2 ) + pow( trackStateAtFirstHit->getReferencePoint()[ 1 ] , 2 ) + pow( trackStateAtFirstHit->getReferencePoint()[ 2 ] , 2 ) ) <= firstHitRef )
+							{
+								mainTrk = refittedTrack;
+								mainTrkMass = trackMass;
+								mainTrackID = TrackID;
+								firstHitRef = sqrt( pow( trackStateAtFirstHit->getReferencePoint()[ 0 ] , 2 ) + pow( trackStateAtFirstHit->getReferencePoint()[ 1 ] , 2 ) + pow( trackStateAtFirstHit->getReferencePoint()[ 2 ] , 2 ) );
+							}
 						}
 					}
 					streamlog_out(DEBUG5) << "	Main track of PFO" << std::endl;
 					streamlog_out(DEBUG5) << *mainTrk << std::endl;
+					pfoFourMomentum = getTrackFourMomentum( mainTrk , mainTrkMass );
+					newPFOCovMat = getChargedPFOCovMat( mainTrk , mainTrkMass );
+					TrackID = mainTrackID;
+/*
 					TrackID = getTruthTrkID( pLCEvent, mainTrk );
 					TrackIndex = this->getTrackIndex( MarlinTrkTracks , mainTrk );
 					streamlog_out(DEBUG6) << "	TrackID: 	" << TrackID << std::endl;
@@ -376,22 +430,22 @@ void ChargedPFOCorrection::processEvent( EVENT::LCEvent *pLCEvent )
 						m_updatePFO = false;
 						streamlog_out(DEBUG2) << "	Standard track is used for updating PFO" << std::endl;
 					}
-					pfoFourMomentum = getTrackFourMomentum( mainTrk , trackMass );
-					newPFOCovMat = getChargedPFOCovMat( mainTrk , trackMass );
 //					m_updatePFO = false;
-				}
+*/				}
 			}
 			else
 			{
 				m_updatePFO = false;
 			}
-
-			int pfoType = ( nTRKsofPFO == 1 || fabs( outputPFO->getCharge() ) >=0.5 ? TrackID : outputPFO->getType() );
+			if ( nTRKsofPFO == 1 || ( nTRKsofPFO == 2 && fabs( outputPFO->getCharge() ) >=0.5 ) )
+			{
+				pfoType = TrackID;
+			}
 
 			double Momentum[3]{ pfoFourMomentum.Px() , pfoFourMomentum.Py() , pfoFourMomentum.Pz() };
 			double Energy = pfoFourMomentum.E();
 			double Mass = pfoFourMomentum.M();
-			if ( m_updatePFO )
+			if ( nTRKsofPFO == 1 && m_updatePFO && Energy > 0.1 )
 			{
 				outputPFO->setType( pfoType );
 				outputPFO->setMomentum( Momentum );
@@ -399,7 +453,67 @@ void ChargedPFOCorrection::processEvent( EVENT::LCEvent *pLCEvent )
 				outputPFO->setCovMatrix( newPFOCovMat );
 				outputPFO->setMass( Mass );
 			}
-			outputPfoCollection->addElement( outputPFO );
+			else if ( nTRKsofPFO == 2 && Energy > 0.1 )
+			{
+				if ( m_updatePFO )
+				{
+					outputPFO->setType( pfoType );
+					outputPFO->setMomentum( Momentum );
+					outputPFO->setEnergy( Energy );
+					outputPFO->setCovMatrix( newPFOCovMat );
+					outputPFO->setMass( Mass );
+				}
+				else
+				{
+					outputPFO->setCovMatrix( newPFOCovMat );
+				}
+			}
+			streamlog_out(DEBUG8) << "	UPDATED PFO:" << std::endl;
+			streamlog_out(DEBUG8) << *outputPFO << std::endl;
+//			outputPfoCollection->addElement( outputPFO );
+
+			newPFO->setType( outputPFO->getType() );
+			newPFO->setMomentum( Momentum );
+			newPFO->setEnergy( Energy );
+			newPFO->setCovMatrix( newPFOCovMat );
+			newPFO->setMass( Mass );
+			newPFO->setCharge( outputPFO->getCharge() );
+			newPFO->setReferencePoint( outputPFO->getReferencePoint() );
+			for ( unsigned int j = 0 ; j < outputPFO->getParticleIDs().size() ; ++j )
+			{
+				ParticleIDImpl* inPID = dynamic_cast<ParticleIDImpl*>( outputPFO->getParticleIDs()[ j ] );
+				ParticleIDImpl* outPID = new ParticleIDImpl;
+				outPID->setType( inPID->getType() );
+				outPID->setPDG( inPID->getPDG() );
+				outPID->setLikelihood( inPID->getLikelihood() );
+				outPID->setAlgorithmType( inPID->getAlgorithmType() ) ;
+				for ( unsigned int k = 0 ; k < inPID->getParameters().size() ; ++k ) outPID->addParameter( inPID->getParameters()[ k ] );
+				newPFO->addParticleID( outPID );
+			}
+			newPFO->setParticleIDUsed( outputPFO->getParticleIDUsed() );
+			newPFO->setGoodnessOfPID( outputPFO->getGoodnessOfPID() );
+			for ( unsigned int j = 0 ; j < outputPFO->getParticles().size() ; ++j )
+			{
+				newPFO->addParticle( outputPFO->getParticles()[ j ] );
+			}
+			for ( unsigned int j = 0 ; j < outputPFO->getClusters().size() ; ++j )
+			{
+				newPFO->addCluster( outputPFO->getClusters()[ j ] );
+			}
+			for ( unsigned int j = 0 ; j < outputPFOtrkvec.size() ; ++j)
+			{
+				newPFO->addTrack( outputPFOtrkvec[ j ] );
+			}
+			newPFO->setStartVertex( outputPFO->getStartVertex() );
+//			if ( m_updatePFOs )
+//			{
+//				outputPfoCollection->addElement( outputPFO );
+//			}
+//			else
+//			{
+//				outputPfoCollection->addElement( newPFO );
+//			}
+			outputPfoCollection->addElement( newPFO );
 		}
 		pLCEvent->addCollection( outputPfoCollection , m_outputPfoCollection );
 	}
